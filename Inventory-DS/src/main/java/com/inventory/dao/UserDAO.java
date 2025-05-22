@@ -7,11 +7,12 @@ import java.util.List;
 
 public class UserDAO {
     // Login validation
-    public User validateUser(String username, String password) throws SQLException {
-        String sql = "SELECT * FROM users WHERE username = ?";
+    public User validateUser(String username, String password, String role) throws SQLException {
+        String sql = "SELECT * FROM users WHERE username = ? AND role = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, username);
+            stmt.setString(2, role);
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
