@@ -7,27 +7,39 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 
 public class DashboardView extends JFrame {
     private User currentUser;
+    private Connection conn;
     private JButton logoutButton;
 
     public DashboardView(User user) {
         this.currentUser = user;
-        initializeUI();
-        setupWindowListener();
+        try {
+            // Initialize database connection
+            this.conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/inventory_ds", "username", "password");
+            initializeUI();
+            setupWindowListener();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Database connection failed: " + e.getMessage(), 
+                "Error", JOptionPane.ERROR_MESSAGE);
+            System.exit(1);
+        }
     }
 
     private void initializeUI() {
         setTitle("Dashboard - Welcome, " + currentUser.getUsername());
-        setSize(800, 600);
+        setSize(1000,700);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE); // Changed for proper cleanup
         setLocationRelativeTo(null);
 
         // Create toolbar with logout button
         JToolBar toolBar = new JToolBar();
         toolBar.setFloatable(false);
-        
+
         logoutButton = new JButton("Logout", new ImageIcon("src/assets/logout.png"));
         styleLogoutButton();
         logoutButton.addActionListener(this::performLogout);
@@ -37,7 +49,7 @@ public class DashboardView extends JFrame {
 
         // Create tabbed interface
         JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.addTab("Products", new ProductView(currentUser));
+        tabbedPane.addTab("Products", new ProductView(currentUser, conn));
         
         if (currentUser.getRole().equals("admin")) {
             tabbedPane.addTab("Users", new UserView()); // Assuming UserView exists

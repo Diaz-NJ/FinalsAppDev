@@ -7,15 +7,22 @@ import java.awt.event.ActionEvent;
 import java.sql.SQLException;
 
 public class RegisterDialog extends JDialog {
+    private JTextField usernameField;
+    private JPasswordField passwordField;
+    private JComboBox<String> roleComboBox;
+
     public RegisterDialog(JFrame parent) {
         super(parent, "Register New User", true);
         setLayout(new GridLayout(4, 2, 10, 10));
-        setSize(300, 200);
+        setSize(400, 200);  // Increased size
+        setLocationRelativeTo(parent);
 
-        JTextField usernameField = new JTextField();
-        JPasswordField passwordField = new JPasswordField();
-        JComboBox<String> roleComboBox = new JComboBox<>(new String[]{"admin", "user"});
+        // Components
+        usernameField = new JTextField(15);
+        passwordField = new JPasswordField(15);
+        roleComboBox = new JComboBox<>(new String[]{"user", "admin"});
 
+        // Layout
         add(new JLabel("Username:"));
         add(usernameField);
         add(new JLabel("Password:"));
@@ -23,25 +30,41 @@ public class RegisterDialog extends JDialog {
         add(new JLabel("Role:"));
         add(roleComboBox);
 
+        // Register Button
         JButton registerButton = new JButton("Register");
-        registerButton.addActionListener(e -> {
-            try {
-                UserDAO userDAO = new UserDAO();
-                userDAO.addUser(
-                    usernameField.getText(),
-                    new String(passwordField.getPassword()), // In real apps, hash this!
-                    (String) roleComboBox.getSelectedItem()
-                );
-                JOptionPane.showMessageDialog(this, "User registered successfully!");
-                dispose();
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-
+        registerButton.addActionListener(this::registerUser);
         add(registerButton);
+
+        // Cancel Button
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(e -> dispose());
+        add(cancelButton);
+
+        pack();  // Adjusts window to fit components
     }
 
-    public RegisterDialog(UserView userView) {
+    private void registerUser(ActionEvent e) {
+        try {
+            String username = usernameField.getText().trim();
+            String password = new String(passwordField.getPassword());
+            String role = (String) roleComboBox.getSelectedItem();
+
+            if (username.isEmpty() || password.isEmpty()) {
+                JOptionPane.showMessageDialog(this, 
+                    "Username and password are required!", 
+                    "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            UserDAO userDAO = new UserDAO();
+            userDAO.addUser(username, password, role);
+            JOptionPane.showMessageDialog(this, 
+                "User registered successfully!");
+            dispose();
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, 
+                "Error: " + ex.getMessage(), 
+                "Database Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 }

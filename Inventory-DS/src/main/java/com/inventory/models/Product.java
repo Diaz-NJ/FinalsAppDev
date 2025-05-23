@@ -3,12 +3,11 @@ package main.java.com.inventory.models;
 public class Product {
     private int id;
     private String name;
-    private String categoryName; // Changed from categoryId
+    private String categoryName;
     private int stock;
     private double price;
     private String description;
 
-    // Constructor
     public Product(int id, String name, String categoryName, int stock, 
                  double price, String description) {
         this.id = id;
@@ -19,14 +18,17 @@ public class Product {
         this.description = description;
     }
 
-    // Getters
+    // Getters and Setters
     public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
     public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
     public String getCategoryName() { return categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
     public int getStock() { return stock; }
-    public double getPrice() { return price; }
-    public String getDescription() { return description; }
-
-    // Setters (optional)
     public void setStock(int stock) { this.stock = stock; }
+    public double getPrice() { return price; }
+    public void setPrice(double price) { this.price = price; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 }

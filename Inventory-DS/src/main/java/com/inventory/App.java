@@ -11,11 +11,11 @@ public class App {
         try {
             // Test UserDAO
             UserDAO userDAO = new UserDAO();
-            User admin = userDAO.validateUser("admin", "admin123");
+            User admin = userDAO.validateUser("admin", "admin123", "admin");
             System.out.println("Logged in as: " + admin.getRole());
 
             // Test ProductDAO
-            ProductDAO productDAO = new ProductDAO();
+            ProductDAO productDAO = new ProductDAO(null);
             Product newProduct = new Product(0, "USB Cable", "Electronics", 50, 9.99, "Type-C Cable");
             productDAO.addProduct(newProduct);
             System.out.println("Product added!");

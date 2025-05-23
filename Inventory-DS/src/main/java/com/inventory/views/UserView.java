@@ -13,6 +13,7 @@ public class UserView extends JPanel {
     private JTable userTable;
     private DefaultTableModel tableModel;
 
+    @SuppressWarnings("unused")
     public UserView() {
         setLayout(new BorderLayout());
 
@@ -26,7 +27,7 @@ public class UserView extends JPanel {
         JPanel buttonPanel = new JPanel();
         JButton addButton = new JButton("Add User");
         JButton deleteButton = new JButton("Delete");
-        JButton refreshButton = new JButton("Refresh");
+        JButton refreshButton = new JButton("View All");
 
         addButton.addActionListener(this::showRegisterDialog);
         deleteButton.addActionListener(this::handleDelete);
@@ -56,7 +57,7 @@ public class UserView extends JPanel {
     }
 
     private void showRegisterDialog(ActionEvent e) {
-        new RegisterDialog(this).setVisible(true);
+        new RegisterDialog((JFrame)SwingUtilities.getWindowAncestor(this)).setVisible(true);
     }
 
     private void handleDelete(ActionEvent e) {
