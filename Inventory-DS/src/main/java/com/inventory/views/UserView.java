@@ -22,8 +22,12 @@ public interface RegisterCallback {
         setLayout(new BorderLayout());
 
         // Table setup
-        String[] columns = {"ID", "Username", "Role"};
-        tableModel = new DefaultTableModel(columns, 0);
+        String[] columns = {"#","ID", "Username", "Role","DB_ID"};
+        tableModel = new DefaultTableModel(columns, 0){ 
+            @Override
+        public boolean isCellEditable(int row, int column) {
+            return false; // Make all cells non-editable
+        }};
         userTable = new JTable(tableModel);
         add(new JScrollPane(userTable), BorderLayout.CENTER);
 
@@ -48,17 +52,69 @@ public interface RegisterCallback {
     private void refreshTable() {
         try {
             tableModel.setRowCount(0);
+             tableModel.setColumnCount(0);
+
+              String[] columns = {"#", "Username", "Role", "DB_ID"}; // 4 columns
+        tableModel.setColumnIdentifiers(columns);
+
             UserDAO userDAO = new UserDAO();
             List<User> users = userDAO.getAllUsers(); // Add this method to UserDAO
 
-            for (User user : users) {
-                Object[] row = {user.getId(), user.getUsername(), user.getRole()};
-                tableModel.addRow(row);
+        for (User user : users) {
+            tableModel.addRow(new Object[] {
+                user.getDisplayId(), // Display position
+                user.getUsername(), 
+                user.getRole(),
+                user.getId() // Hidden actual ID
+            });
+        }
+         userTable.removeColumn(userTable.getColumnModel().getColumn(3));
+    } catch (SQLException e) {
+        JOptionPane.showMessageDialog(this, 
+            "Error loading users: " + e.getMessage(), 
+            "Error", 
+            JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+private void handleDelete(ActionEvent e) {
+    int selectedRow = userTable.getSelectedRow();
+    if (selectedRow >= 0) {
+        // Get the actual ID from the hidden column (column 3 in this case)
+        int userIdToDelete = (int) tableModel.getValueAt(selectedRow, 3); // Renamed from actualUserId
+        String username = (String) tableModel.getValueAt(selectedRow, 1);
+        
+        int confirm = JOptionPane.showConfirmDialog(
+            this,
+            "Permanently delete user '" + username + "'?",
+            "Confirm User Deletion",
+            JOptionPane.YES_NO_OPTION
+        );
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            try {
+                UserDAO userDAO = new UserDAO();
+                boolean success = userDAO.deleteUser(userIdToDelete); // Use actual ID
+                
+                if (success) {
+                    refreshTable();
+                    JOptionPane.showMessageDialog(this, "User deleted successfully");
+                } else {
+                    JOptionPane.showMessageDialog(this, 
+                        "Failed to delete user", 
+                        "Error", 
+                        JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this,
+                    "Database error: " + ex.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
             }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this, "Error loading users: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+}
 
     private void showRegisterDialog(ActionEvent e) {
     RegisterDialog dialog = new RegisterDialog((JFrame)SwingUtilities.getWindowAncestor(this));
@@ -85,33 +141,4 @@ public interface RegisterCallback {
     });
     dialog.setVisible(true);
 }
-    
-
-    private void handleDelete(ActionEvent e) {
-        int selectedRow = userTable.getSelectedRow();
-        if (selectedRow >= 0) {
-            String username = (String) tableModel.getValueAt(selectedRow, 1);
-    int confirm = JOptionPane.showConfirmDialog(
-        this,
-        "Permanently delete user '" + username + "'?",
-        "Confirm User Deletion",
-        JOptionPane.YES_NO_OPTION,
-        JOptionPane.ERROR_MESSAGE
-    );
-    
-    if (confirm != JOptionPane.YES_OPTION) {
-        return; // Exit if user cancels
-    }
-            int userId = (int) tableModel.getValueAt(selectedRow, 0);
-            try {
-                UserDAO userDAO = new UserDAO();
-                userDAO.deleteUser(userId); // Add this method to UserDAO
-                refreshTable();
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this, "Delete failed: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        } else {
-            JOptionPane.showMessageDialog(this, "Select a user first!", "Error", JOptionPane.WARNING_MESSAGE);
-        }
-    }
 }

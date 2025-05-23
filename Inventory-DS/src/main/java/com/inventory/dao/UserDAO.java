@@ -6,6 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UserDAO {
+    private Connection conn;
+     public UserDAO() throws SQLException {
+        this.conn = DBConnection.getConnection();
+    }
     // Login validation
     public User validateUser(String username, String password, String role) throws SQLException {
         String sql = "SELECT * FROM users WHERE username = ? AND role = ?";
@@ -57,27 +61,44 @@ public class UserDAO {
     // Add to UserDAO.java
 public List<User> getAllUsers() throws SQLException {
     List<User> users = new ArrayList<>();
-    String sql = "SELECT * FROM users";
-    try (Connection conn = DBConnection.getConnection();
-         Statement stmt = conn.createStatement();
+    String sql = "SELECT id, username, role FROM users ORDER BY id";
+
+   try (Statement stmt = conn.createStatement();
          ResultSet rs = stmt.executeQuery(sql)) {
+
+        int sequenceNumber = 1;
         while (rs.next()) {
-            users.add(new User(
-                rs.getInt("id"),
+            User user = new User(
+                rs.getInt("id"), // Display this instead of id
                 rs.getString("username"),
                 rs.getString("role")
-            ));
+            );
+            user.setDisplayId(sequenceNumber++);
+            users.add(user);
         }
     }
     return users;
 }
 
-public void deleteUser(int userId) throws SQLException {
-    String sql = "DELETE FROM users WHERE id=?";
+public boolean deleteUser(int userId) throws SQLException {
+    // First verify user exists
+    String checkSql = "SELECT id FROM users WHERE id = ?";
+    String deleteSql = "DELETE FROM users WHERE id = ?";
+    
     try (Connection conn = DBConnection.getConnection();
-         PreparedStatement stmt = conn.prepareStatement(sql)) {
-        stmt.setInt(1, userId);
-        stmt.executeUpdate();
+         PreparedStatement checkStmt = conn.prepareStatement(checkSql);
+         PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
+        
+        // Check existence
+        checkStmt.setInt(1, userId);
+        ResultSet rs = checkStmt.executeQuery();
+        if (!rs.next()) {
+            return false; // User doesn't exist
+        }
+        
+        // Delete user
+        deleteStmt.setInt(1, userId);
+        return deleteStmt.executeUpdate() > 0;
     }
 }
 
