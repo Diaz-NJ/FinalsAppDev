@@ -1,6 +1,7 @@
 package main.java.com.inventory.views;
 
 import main.java.com.inventory.dao.UserDAO;
+import main.java.com.inventory.views.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -10,6 +11,7 @@ public class RegisterDialog extends JDialog {
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JComboBox<String> roleComboBox;
+    private RegisterCallback callback;
 
     public RegisterDialog(JFrame parent) {
         super(parent, "Register New User", true);
@@ -43,18 +45,25 @@ public class RegisterDialog extends JDialog {
         pack();  // Adjusts window to fit components
     }
 
+ public interface RegisterCallback {
+    void onRegister(String username, String password, String role);
+}
+
+public void setRegisterCallback(RegisterCallback callback) {
+    this.callback = callback;
+}
+
     private void registerUser(ActionEvent e) {
         try {
             String username = usernameField.getText().trim();
             String password = new String(passwordField.getPassword());
             String role = (String) roleComboBox.getSelectedItem();
 
-            if (username.isEmpty() || password.isEmpty()) {
-                JOptionPane.showMessageDialog(this, 
-                    "Username and password are required!", 
-                    "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
+             if (callback != null) {
+        callback.onRegister(username, password, role);
+    }
+    dispose();
+
 
             UserDAO userDAO = new UserDAO();
             userDAO.addUser(username, password, role);

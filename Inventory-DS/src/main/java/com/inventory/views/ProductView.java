@@ -153,7 +153,18 @@ public class ProductView extends JPanel {
         dialog.add(descField);
 
         JButton saveButton = new JButton("Save");
-        saveButton.addActionListener(e -> {
+            saveButton.addActionListener(e -> {
+    // ADD THIS CONFIRMATION BLOCK:
+    int confirm = JOptionPane.showConfirmDialog(
+        this,
+        "Are you sure you want to " + (product == null ? "add" : "update") + " this product?",
+        "Confirm " + (product == null ? "Add" : "Update"),
+        JOptionPane.YES_NO_OPTION
+    );
+    
+    if (confirm != JOptionPane.YES_OPTION) {
+        return; // Exit if user cancels
+    }
             try {
                 Product editedProduct = new Product(
                     product != null ? product.getId() : 0,
@@ -181,7 +192,7 @@ public class ProductView extends JPanel {
                 showError("Invalid number format");
             } catch (SQLException ex) {
                 showError("Database error: " + ex.getMessage());
-            }
+            } 
         });
 
         dialog.add(saveButton);
