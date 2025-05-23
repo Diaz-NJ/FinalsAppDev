@@ -83,23 +83,23 @@ public class ProductView extends JPanel {
     }
 
     private void refreshTable() {
+        tableModel.setRowCount(0);
         try {
-            tableModel.setRowCount(0);
-            System.out.println("[DEBUG] Fetching products...");
             List<Product> products = productDAO.getAllProducts();
-            System.out.println("[DEBUG] Found " + products.size() + " products");
-            for (Product product : products) {
-                tableModel.addRow(new Object[]{
-                    product.getId(),
-                    product.getName(),
-                    product.getCategoryName(),
-                    product.getStock(),
-                    String.format("₱%.2f", product.getPrice()),
-                    product.getDescription()
+        System.out.println("[DEBUG] Displaying " + products.size() + " products"); // Debug
+        for (Product product : products) {
+            tableModel.addRow(new Object[]{
+                product.getId(),
+                product.getName(),
+                product.getCategoryName(),
+                product.getStock() == null ? 0 : product.getStock(), // Handle NULL
+                String.format("₱%.2f", product.getPrice()),
+                product.getDescription()
                 });
             }
         } catch (SQLException e) {
-            showError("Error loading products: " + e.getMessage());
+            System.err.println("Error in refreshTable: " + e.getMessage()); // Debug
+        showError("Error loading products: " + e.getMessage());
         }
     }
 

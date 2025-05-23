@@ -13,27 +13,56 @@ public class ProductDAO {
     }
 
     // Create
-    public boolean addProduct(Product product) throws SQLException {
-        String sql = "INSERT INTO products (name, category_name, stock, price, description) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            stmt.setString(1, product.getName());
-            stmt.setString(2, product.getCategoryName());
-            stmt.setInt(3, product.getStock());
-            stmt.setDouble(4, product.getPrice());
-            stmt.setString(5, product.getDescription());
-            int affectedRows = stmt.executeUpdate();
-            
-            if (affectedRows > 0) {
-                try (ResultSet rs = stmt.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        product.setId(rs.getInt(1));
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
+public boolean addProduct(Product product) throws SQLException {
+    // 1. Get or create category
+    int categoryId;
+    try {
+        categoryId = getCategoryId(product.getCategoryName());
+    } catch (SQLException e) {
+        // Category doesn't exist - create it
+        System.out.println("[DEBUG] Creating new category: " + product.getCategoryName());
+        categoryId = createCategory(product.getCategoryName());
     }
+
+    // 2. Add product with the category ID
+    String sql = "INSERT INTO products (name, category_id, stock, price, description) VALUES (?, ?, ?, ?, ?)";
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+        stmt.setString(1, product.getName());
+        stmt.setInt(2, categoryId);
+        stmt.setInt(3, product.getStock());
+        stmt.setDouble(4, product.getPrice());
+        stmt.setString(5, product.getDescription());
+        
+        return stmt.executeUpdate() > 0;
+    }
+}
+
+private int createCategory(String categoryName) throws SQLException {
+    String sql = "INSERT INTO categories (name) VALUES (?)";
+    try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        stmt.setString(1, categoryName);
+        stmt.executeUpdate();
+        
+        try (ResultSet rs = stmt.getGeneratedKeys()) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        }
+        throw new SQLException("Failed to create category");
+    }
+}
+
+private int getCategoryId(String categoryName) throws SQLException {
+    String sql = "SELECT id FROM categories WHERE name = ?";
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+        stmt.setString(1, categoryName);
+        ResultSet rs = stmt.executeQuery();
+        if (rs.next()) {
+            return rs.getInt("id");
+        }
+        throw new SQLException("Category not found");
+    }
+}  
 
     // Read (single)
     public Product getProduct(int id) throws SQLException {
@@ -59,19 +88,21 @@ public class ProductDAO {
     // Read (all)
     public List<Product> getAllProducts() throws SQLException {
         List<Product> products = new ArrayList<>();
-        String sql = "SELECT p.id, p.name, c.name AS category_name, p.stock, p.price, p.description " +
-             "FROM products p JOIN categories c ON p.category_name = c.id";
+        String sql = "SELECT p.id, p.name, c.name AS category_name, p.stock, " +
+                 "p.price, p.description FROM products p " +
+                 "LEFT JOIN categories c ON p.category_id = c.id";
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                products.add(new Product(
+                Product product = new Product(
                     rs.getInt("id"),
                     rs.getString("name"),
                     rs.getString("category_name"),
                     rs.getInt("stock"),
                     rs.getDouble("price"),
                     rs.getString("description")
-                ));
+                );
+            products.add(product);
             }
         }
         return products;
@@ -88,14 +119,15 @@ public class ProductDAO {
             idStmt.setInt(1, searchId);
             ResultSet rs = idStmt.executeQuery();
             if (rs.next()) {
-                products.add(new Product(
+                Product product = new Product(
                     rs.getInt("id"),
                     rs.getString("name"),
                     rs.getString("category_name"),
                     rs.getInt("stock"),
                     rs.getDouble("price"),
                     rs.getString("description")
-                ));
+                );
+                products.add(product);
                 return products; // Return immediately if ID match found
             }
         }
@@ -111,14 +143,15 @@ public class ProductDAO {
         textStmt.setString(2, searchTerm);
         ResultSet rs = textStmt.executeQuery();
         while (rs.next()) {
-            products.add(new Product(
+            Product product = new Product(
                 rs.getInt("id"),
                 rs.getString("name"),
                 rs.getString("category_name"),
                 rs.getInt("stock"),
                 rs.getDouble("price"),
                 rs.getString("description")
-            ));
+            );
+            products.add(product);
         }
     }
     return products;

@@ -1,6 +1,7 @@
 package main.java.com.inventory.views;
 
 import main.java.com.inventory.dao.UserDAO;
+import main.java.com.inventory.models.User;
 import main.java.com.inventory.views.*;
 import javax.swing.*;
 import java.awt.*;
@@ -59,21 +60,43 @@ public void setRegisterCallback(RegisterCallback callback) {
             String password = new String(passwordField.getPassword());
             String role = (String) roleComboBox.getSelectedItem();
 
-             if (callback != null) {
-        callback.onRegister(username, password, role);
-    }
-    dispose();
+               if (username.isEmpty() || password.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "Username and password cannot be empty", 
+                "Validation Error", 
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
 
 
             UserDAO userDAO = new UserDAO();
-            userDAO.addUser(username, password, role);
+            User newUser = new User(0, username, role); // ID 0 for new user
+        
+        try {
+            userDAO.addUser(newUser, password);
             JOptionPane.showMessageDialog(this, 
                 "User registered successfully!");
             dispose();
         } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, 
-                "Error: " + ex.getMessage(), 
-                "Database Error", JOptionPane.ERROR_MESSAGE);
+            // Handle specific duplicate username case
+            if (ex.getMessage().contains("Duplicate entry") || 
+                ex.getMessage().contains("already exists")) {
+                JOptionPane.showMessageDialog(this,
+                    "Username '" + username + "' is already taken.\nPlease choose a different username.",
+                    "Registration Failed",
+                    JOptionPane.ERROR_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this,
+                    "Error: " + ex.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+            }
         }
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this,
+            "Unexpected error: " + ex.getMessage(),
+            "Error",
+            JOptionPane.ERROR_MESSAGE);
     }
+}
 }

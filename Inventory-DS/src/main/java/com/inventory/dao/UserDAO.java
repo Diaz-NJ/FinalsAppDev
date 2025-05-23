@@ -32,10 +32,23 @@ public class UserDAO {
 
     // Add a new user (for admin)
     public void addUser(User user, String password) throws SQLException {
+        if (user == null || user.getUsername() == null || user.getUsername().trim().isEmpty()) {
+        throw new SQLException("Username cannot be empty");
+    }
+        String checkSql = "SELECT COUNT(*) FROM users WHERE username = ?";
+    try (Connection conn = DBConnection.getConnection();
+         PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+        checkStmt.setString(1, user.getUsername());
+        ResultSet rs = checkStmt.executeQuery();
+
+        if (rs.next() && rs.getInt(1) > 0) {
+            throw new SQLException("Username already exists");
+        }
+    }
         String sql = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, user.getUsername());
+            stmt.setString(1, user.getUsername().trim());
             stmt.setString(2, password); // Store hashed password in real apps
             stmt.setString(3, user.getRole());
             stmt.executeUpdate();
