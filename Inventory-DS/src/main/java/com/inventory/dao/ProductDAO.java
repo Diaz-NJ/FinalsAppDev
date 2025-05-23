@@ -172,11 +172,33 @@ private int getCategoryId(String categoryName) throws SQLException {
     }
 
     // Delete
-    public boolean deleteProduct(int productId) throws SQLException {
-        String sql = "DELETE FROM products WHERE id=?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, productId);
-            return stmt.executeUpdate() > 0;
+public boolean deleteProduct(int productId) throws SQLException {
+    String sql = "DELETE FROM products WHERE id = ?";
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+        stmt.setInt(1, productId);
+        int affectedRows = stmt.executeUpdate();
+        
+        if (affectedRows > 0) {
+            resetAutoIncrement(); // Reset counter after deletion
+            return true;
+        }
+        return false;
+    }
+}
+
+private void resetAutoIncrement() throws SQLException {
+    // Get current max ID
+    String maxIdSql = "SELECT MAX(id) FROM products";
+    try (Statement stmt = conn.createStatement();
+         ResultSet rs = stmt.executeQuery(maxIdSql)) {
+        if (rs.next()) {
+            int maxId = rs.getInt(1);
+            // Reset auto-increment to next available number
+            String resetSql = "ALTER TABLE products AUTO_INCREMENT = " + (maxId + 1);
+            try (Statement resetStmt = conn.createStatement()) {
+                resetStmt.executeUpdate(resetSql);
+            }
         }
     }
+}
 }
