@@ -38,7 +38,7 @@ public class LoginView extends JFrame {
 
         // Role
         panel.add(new JLabel("Role:"));
-        roleComboBox = new JComboBox<>(new String[]{"user", "admin"});
+        roleComboBox = new JComboBox<>(new String[]{"User", "Admin"});
         panel.add(roleComboBox);
 
         // Login Button

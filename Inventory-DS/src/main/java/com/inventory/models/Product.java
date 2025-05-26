@@ -2,6 +2,7 @@ package main.java.com.inventory.models;
 
 public class Product {
     private int id;
+    private int displayId; // New field for sequential display
     private String name;
     private String categoryName;
     private Integer stock;
@@ -16,11 +17,13 @@ public class Product {
         this.stock = stock;
         this.price = price;
         this.description = description;
+        this.displayId = 0; // Initialize to 0
     }
 
-    // Getters and Setters
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
+    public int getDisplayId() { return displayId; }
+    public void setDisplayId(int displayId) { this.displayId = displayId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public String getCategoryName() { return categoryName; }

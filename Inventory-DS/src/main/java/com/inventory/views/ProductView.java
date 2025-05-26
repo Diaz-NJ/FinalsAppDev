@@ -18,19 +18,21 @@ public class ProductView extends JPanel {
     private User currentUser;
     private ProductDAO productDAO;
     private JTextField searchField;
-    private JButton addButton, editButton, deleteButton, refreshButton;
+    private JButton addButton, editButton, deleteButton, refreshButton, lowStockButton;    
+    private static final int LOW_STOCK_THRESHOLD = 20;
 
     public ProductView(User user, Connection conn) {
         this.currentUser = user;
         this.productDAO = new ProductDAO(conn);
         setLayout(new BorderLayout());
+        setupKeyBindings();
         initializeUI();
         refreshTable();
     }
 
     private void initializeUI() {
-        // Search Panel
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
         searchPanel.add(new JLabel("Search:"));
         searchField = new JTextField(20);
         searchField.addKeyListener(new KeyAdapter() {
@@ -42,7 +44,7 @@ public class ProductView extends JPanel {
         add(searchPanel, BorderLayout.NORTH);
 
         // Table setup
-        String[] columns = {"ID", "Name", "Category", "Stock", "Price", "Description"};
+        String[] columns = {"ID", "Name", "Category", "Stock", "Price", "Description", "DB_ID"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -51,65 +53,174 @@ public class ProductView extends JPanel {
         };
         productTable = new JTable(tableModel);
         productTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        add(new JScrollPane(productTable), BorderLayout.CENTER);
 
-        // Button Panel
+        JScrollPane scrollPane = new JScrollPane(productTable);
+        add(scrollPane, BorderLayout.CENTER);
+
+        productTable.removeColumn(productTable.getColumnModel().getColumn(6));
+
         JPanel buttonPanel = new JPanel();
         addButton = new JButton("Add");
         editButton = new JButton("Edit");
         deleteButton = new JButton("Delete");
         refreshButton = new JButton("View All");
+        lowStockButton = new JButton("Check Low Stock");
 
         addButton.addActionListener(e -> showProductDialog(null));
         editButton.addActionListener(e -> editSelectedProduct());
         deleteButton.addActionListener(e -> deleteSelectedProduct());
         refreshButton.addActionListener(e -> refreshTable());
+        lowStockButton.addActionListener(e -> checkLowStock());
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
         buttonPanel.add(deleteButton);
         buttonPanel.add(refreshButton);
+        buttonPanel.add(lowStockButton);
 
         refreshButton.setToolTipText("View all products");
         searchField.setToolTipText("Searches ID first, then name/description");
+        lowStockButton.setToolTipText("Check products with low stock (Ctrl+L)");
 
-        // Disable edit/delete for non-admin users
         if (!currentUser.getRole().equals("admin")) {
             editButton.setEnabled(false);
             deleteButton.setEnabled(false);
+            lowStockButton.setEnabled(false);
         }
 
         add(buttonPanel, BorderLayout.SOUTH);
+    }
+
+    private void setupKeyBindings() {
+        InputMap inputMap = getInputMap(WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = getActionMap();
+
+        // Ctrl+S: Focus search field
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK), "search");
+        actionMap.put("search", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                searchField.requestFocusInWindow();
+            }
+        });
+
+        // Ctrl+A: Add product
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.CTRL_DOWN_MASK), "add");
+        actionMap.put("add", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (currentUser.getRole().equals("admin")) {
+                    showProductDialog(null);
+                }
+            }
+        });
+
+        // Ctrl+E: Edit product
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK), "edit");
+        actionMap.put("edit", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (currentUser.getRole().equals("admin")) {
+                    editSelectedProduct();
+                }
+            }
+        });
+
+        // Ctrl+D: Delete product
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "delete");
+        actionMap.put("delete", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (currentUser.getRole().equals("admin")) {
+                    deleteSelectedProduct();
+                }
+            }
+        });
+
+        // Ctrl+R: Refresh table
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK), "refresh");
+        actionMap.put("refresh", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                refreshTable();
+            }
+        });
+
+        // Ctrl+L: Check low stock
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK), "lowStock");
+        actionMap.put("lowStock", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (currentUser.getRole().equals("admin")) {
+                    checkLowStock();
+                }
+            }
+        });
     }
 
     private void refreshTable() {
         tableModel.setRowCount(0);
         try {
             List<Product> products = productDAO.getAllProducts();
-        System.out.println("[DEBUG] Displaying " + products.size() + " products"); // Debug
-        for (Product product : products) {
-            tableModel.addRow(new Object[]{
-                product.getId(),
-                product.getName(),
-                product.getCategoryName(),
-                product.getStock() == null ? 0 : product.getStock(), // Handle NULL
-                String.format("₱%.2f", product.getPrice()),
-                product.getDescription()
+            for (Product product : products) {
+                tableModel.addRow(new Object[]{
+                    product.getDisplayId(),
+                    product.getName(),
+                    product.getCategoryName(),
+                    product.getStock() == null ? 0 : product.getStock(),
+                    String.format("₱%.2f", product.getPrice()),
+                    product.getDescription(),
+                    product.getId() // Store actual ID in hidden column
                 });
+            } checkLowStockOnRefresh();
+        } catch (SQLException e) {
+            System.err.println("Error in refreshTable: " + e.getMessage());
+            showError("Error loading products: " + e.getMessage());
+        }
+    }
+
+        private void checkLowStockOnRefresh() {
+        try {
+            List<Product> lowStockProducts = productDAO.getLowStockProducts(LOW_STOCK_THRESHOLD);
+            if (!lowStockProducts.isEmpty()) {
+                StringBuilder message = new StringBuilder("Low stock alert:\n");
+                for (Product product : lowStockProducts) {
+                    message.append(String.format("ID: %d, Name: %s, Stock: %d\n",
+                        product.getId(), product.getName(), product.getStock()));
+                }
+                JOptionPane.showMessageDialog(this, message.toString(),
+                    "Low Stock Alert", JOptionPane.WARNING_MESSAGE);
             }
         } catch (SQLException e) {
-            System.err.println("Error in refreshTable: " + e.getMessage()); // Debug
-        showError("Error loading products: " + e.getMessage());
+            showError("Error checking low stock: " + e.getMessage());
+        }
+    }
+
+    private void checkLowStock() {
+        try {
+            List<Product> lowStockProducts = productDAO.getLowStockProducts(LOW_STOCK_THRESHOLD);
+            if (lowStockProducts.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No products with low stock.",
+                    "Low Stock Check", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                StringBuilder message = new StringBuilder("Low stock products:\n");
+                for (Product product : lowStockProducts) {
+                    message.append(String.format("ID: %d, Name: %s, Stock: %d\n",
+                        product.getId(), product.getName(), product.getStock()));
+                }
+                JOptionPane.showMessageDialog(this, message.toString(),
+                    "Low Stock Products", JOptionPane.WARNING_MESSAGE);
+            }
+        } catch (SQLException e) {
+            showError("Error checking low stock: " + e.getMessage());
         }
     }
 
     private void searchProducts() {
         String query = searchField.getText().trim();
-        System.out.println("[DEBUG] Searching for: '" + query + "'");
         try {
             tableModel.setRowCount(0);
             List<Product> products = new ArrayList<>();
-            System.out.println("[DEBUG] Search results: " + products.size() + " items");
             if (query.isEmpty()) {
                 products = productDAO.getAllProducts();
             } else {
@@ -117,12 +228,13 @@ public class ProductView extends JPanel {
             }
             for (Product product : products) {
                 tableModel.addRow(new Object[]{
-                    product.getId(),
+                    product.getDisplayId(),
                     product.getName(),
                     product.getCategoryName(),
                     product.getStock(),
                     String.format("₱%.2f", product.getPrice()),
-                    product.getDescription()
+                    product.getDescription(),
+                    product.getId() // Store actual ID in hidden column
                 });
             }
         } catch (SQLException e) {
@@ -153,18 +265,17 @@ public class ProductView extends JPanel {
         dialog.add(descField);
 
         JButton saveButton = new JButton("Save");
-            saveButton.addActionListener(e -> {
-    // ADD THIS CONFIRMATION BLOCK:
-    int confirm = JOptionPane.showConfirmDialog(
-        this,
-        "Are you sure you want to " + (product == null ? "add" : "update") + " this product?",
-        "Confirm " + (product == null ? "Add" : "Update"),
-        JOptionPane.YES_NO_OPTION
-    );
+        saveButton.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to " + (product == null ? "add" : "update") + " this product?",
+                "Confirm " + (product == null ? "Add" : "Update"),
+                JOptionPane.YES_NO_OPTION
+            );
     
-    if (confirm != JOptionPane.YES_OPTION) {
-        return; // Exit if user cancels
-    }
+            if (confirm != JOptionPane.YES_OPTION) {
+                return;
+            }
             try {
                 Product editedProduct = new Product(
                     product != null ? product.getId() : 0,
@@ -204,7 +315,7 @@ public class ProductView extends JPanel {
     private void editSelectedProduct() {
         int selectedRow = productTable.getSelectedRow();
         if (selectedRow >= 0) {
-            int productId = (int) tableModel.getValueAt(selectedRow, 0);
+            int productId = (int) tableModel.getValueAt(selectedRow, 6); // Use hidden DB_ID column
             try {
                 Product product = productDAO.getProduct(productId);
                 if (product != null) {
@@ -227,7 +338,7 @@ public class ProductView extends JPanel {
                 JOptionPane.YES_NO_OPTION);
             
             if (confirm == JOptionPane.YES_OPTION) {
-                int productId = (int) tableModel.getValueAt(selectedRow, 0);
+                int productId = (int) tableModel.getValueAt(selectedRow, 6); // Use hidden DB_ID column
                 try {
                     if (productDAO.deleteProduct(productId)) {
                         refreshTable();
