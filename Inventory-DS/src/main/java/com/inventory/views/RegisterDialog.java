@@ -2,10 +2,12 @@ package main.java.com.inventory.views;
 
 import main.java.com.inventory.dao.UserDAO;
 import main.java.com.inventory.models.User;
-import main.java.com.inventory.views.*;
+import main.java.com.inventory.utils.ErrorHandler;
+import main.java.com.inventory.dao.DBConnection;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.sql.Connection;
 import java.sql.SQLException;
 
 public class RegisterDialog extends JDialog {
@@ -20,12 +22,10 @@ public class RegisterDialog extends JDialog {
         setSize(400, 200);  // Increased size
         setLocationRelativeTo(parent);
 
-        // Components
         usernameField = new JTextField(15);
         passwordField = new JPasswordField(15);
         roleComboBox = new JComboBox<>(new String[]{"user", "admin"});
 
-        // Layout
         add(new JLabel("Username:"));
         add(usernameField);
         add(new JLabel("Password:"));
@@ -33,21 +33,19 @@ public class RegisterDialog extends JDialog {
         add(new JLabel("Role:"));
         add(roleComboBox);
 
-        // Register Button
         JButton registerButton = new JButton("Register");
         registerButton.addActionListener(this::registerUser);
         add(registerButton);
 
-        // Cancel Button
         JButton cancelButton = new JButton("Cancel");
         cancelButton.addActionListener(e -> dispose());
         add(cancelButton);
 
-        pack();  // Adjusts window to fit components
+        pack();
     }
 
  public interface RegisterCallback {
-    void onRegister(String username, String password, String role);
+    void onRegister(String username, String password, String role, boolean success  );
 }
 
 public void setRegisterCallback(RegisterCallback callback) {
@@ -61,42 +59,53 @@ public void setRegisterCallback(RegisterCallback callback) {
             String role = (String) roleComboBox.getSelectedItem();
 
                if (username.isEmpty() || password.isEmpty()) {
-            JOptionPane.showMessageDialog(this, 
-                "Username and password cannot be empty", 
-                "Validation Error", 
-                JOptionPane.ERROR_MESSAGE);
-            return;
+            throw new IllegalArgumentException("Username and password cannot be empty");
         }
 
+        if (username.length() < 3) {
+                throw new IllegalArgumentException("Username must be at least 3 characters long");
+            }
 
-            UserDAO userDAO = new UserDAO();
-            User newUser = new User(0, username, role); // ID 0 for new user
-        
-        try {
-            userDAO.addUser(newUser, password);
-            JOptionPane.showMessageDialog(this, 
-                "User registered successfully!");
+            if (password.length() < 6) {
+                throw new IllegalArgumentException("Password must be at least 6 characters long");
+            }
+
+             Connection conn = DBConnection.getConnection();
+            UserDAO userDAO = new UserDAO(conn);
+            
+            if (userDAO.usernameExists(username)) {
+                throw new IllegalArgumentException("Username '" + username + "' is already taken");
+            }
+
             dispose();
-        } catch (SQLException ex) {
-            // Handle specific duplicate username case
-            if (ex.getMessage().contains("Duplicate entry") || 
-                ex.getMessage().contains("already exists")) {
-                JOptionPane.showMessageDialog(this,
-                    "Username '" + username + "' is already taken.\nPlease choose a different username.",
-                    "Registration Failed",
-                    JOptionPane.ERROR_MESSAGE);
+            if (callback != null) {
+                callback.onRegister(username, password, role, true);
             } else {
-                JOptionPane.showMessageDialog(this,
-                    "Error: " + ex.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+                throw new SQLException("Failed to add user: " + username);
+            }
+        
+        } catch (SQLException ex) {
+            String message = ex.getMessage().contains("Duplicate entry") || 
+                             ex.getMessage().contains("already exists") ?
+                             "Username '" + usernameField.getText().trim() + "' is already taken" :
+                             "Database error while registering user";
+            ErrorHandler.handleError(this, message, ex);
+        if (callback != null) {
+                callback.onRegister(usernameField.getText().trim(), new String(passwordField.getPassword()),
+                    (String) roleComboBox.getSelectedItem(), false);
+            }
+        } catch (IllegalArgumentException ex) {
+            ErrorHandler.handleError(this, ex.getMessage(), ex);
+            if (callback != null) {
+                callback.onRegister(usernameField.getText().trim(), new String(passwordField.getPassword()),
+                    (String) roleComboBox.getSelectedItem(), false);
+            }
+        } catch (Exception ex) {
+            ErrorHandler.handleError(this, "Unexpected error while registering user", ex);
+            if (callback != null) {
+                callback.onRegister(usernameField.getText().trim(), new String(passwordField.getPassword()),
+                    (String) roleComboBox.getSelectedItem(), false);
             }
         }
-    } catch (Exception ex) {
-        JOptionPane.showMessageDialog(this,
-            "Unexpected error: " + ex.getMessage(),
-            "Error",
-            JOptionPane.ERROR_MESSAGE);
     }
-}
 }

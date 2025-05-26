@@ -10,7 +10,7 @@ public class App {
     public static void main(String[] args) {
         try {
             // Test UserDAO
-            UserDAO userDAO = new UserDAO();
+            UserDAO userDAO = new UserDAO(null);
             User admin = userDAO.validateUser("admin", "admin123", "admin");
             System.out.println("Logged in as: " + admin.getRole());
 

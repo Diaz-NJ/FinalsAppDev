@@ -7,109 +7,118 @@ import java.util.List;
 
 public class UserDAO {
     private Connection conn;
-     public UserDAO() throws SQLException {
-        this.conn = DBConnection.getConnection();
-    }
-    // Login validation
-    public User validateUser(String username, String password, String role) throws SQLException {
-        String sql = "SELECT * FROM users WHERE username = ? AND role = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, username);
-            stmt.setString(2, role);
-            ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                // In a real app, use BCrypt.checkpw(password, storedHash)
-                String storedHash = rs.getString("password");
-                if (password.equals(storedHash)) { // Replace with proper hashing
-                    return new User(
-                        rs.getInt("id"),
-                        rs.getString("username"),
-                        rs.getString("role")
-                    );
+    public UserDAO(Connection conn) {
+        this.conn = conn;
+    }
+
+    public User validateUser(String username, String password, String role) throws SQLException {
+        String sql = "SELECT * FROM users WHERE username = ? AND password = ? AND role = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, username);
+            stmt.setString(2, password);
+            stmt.setString(3, role);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    User user = new User(rs.getInt("id"), rs.getString("username"), rs.getString("role"));
+                    user.setPermissions(rs.getString("permissions"));
+                    return user;
                 }
             }
-            return null; // Invalid credentials
         }
+        return null;
     }
 
-    // Add a new user (for admin)
-    public void addUser(User user, String password) throws SQLException {
-        if (user == null || user.getUsername() == null || user.getUsername().trim().isEmpty()) {
-        throw new SQLException("Username cannot be empty");
-    }
-        String checkSql = "SELECT COUNT(*) FROM users WHERE username = ?";
-    try (Connection conn = DBConnection.getConnection();
-         PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
-        checkStmt.setString(1, user.getUsername());
-        ResultSet rs = checkStmt.executeQuery();
-
-        if (rs.next() && rs.getInt(1) > 0) {
-            throw new SQLException("Username already exists");
+    public boolean usernameExists(String username) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, username);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                     boolean exists = rs.getInt(1) > 0;
+                    System.out.println("[DEBUG] usernameExists('" + username + "') -> " + exists);
+                    return exists;
+                }
+            }
         }
+        return false;
     }
-        String sql = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, user.getUsername().trim());
-            stmt.setString(2, password); // Store hashed password in real apps
+
+    public boolean addUser(User user, String password) throws SQLException {
+        boolean autoCommit = conn.getAutoCommit();
+        try {
+            conn.setAutoCommit(false); // Start transaction
+            if (usernameExists(user.getUsername())) {
+                System.out.println("[DEBUG] addUser: Username '" + user.getUsername() + "' already exists, aborting insert");
+                conn.rollback();
+                return false;
+            }
+
+        String sql = "INSERT INTO users (username, password, role, permissions) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, user.getUsername());
+            stmt.setString(2, password); 
             stmt.setString(3, user.getRole());
-            stmt.executeUpdate();
+            stmt.setString(4, user.getPermissions());
+            int affectedRows = stmt.executeUpdate();
+            if (affectedRows > 0) {
+                try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        user.setId(generatedKeys.getInt(1));
+                    }
+                }
+                conn.commit();
+                    System.out.println("[DEBUG] Successfully added user: " + user.getUsername() + " with ID: " + user.getId());
+                    return true;
+            }
+            conn.rollback();
+                System.out.println("[DEBUG] Failed to add user: " + user.getUsername() + " (no rows affected)");
+                return false;
+        }
+    } catch (SQLException e) {
+            conn.rollback();
+            System.err.println("[ERROR] Failed to add user: " + user.getUsername() + " - " + e.getMessage());
+            throw e;
+        } finally {
+            conn.setAutoCommit(autoCommit);
         }
     }
-    // Add to UserDAO.java
-public List<User> getAllUsers() throws SQLException {
-    List<User> users = new ArrayList<>();
-    String sql = "SELECT id, username, role FROM users ORDER BY id";
 
-   try (Statement stmt = conn.createStatement();
-         ResultSet rs = stmt.executeQuery(sql)) {
+    public boolean addUser(String username, String password, String role) throws SQLException {
+        User user = new User(0, username, role);
+        user.setPermissions("add:1,edit:1,delete:1,addUser:0,deleteUser:0,lowStock:1");
+        return addUser(user, password);
+    }
 
-        int sequenceNumber = 1;
-        while (rs.next()) {
-            User user = new User(
-                rs.getInt("id"), // Display this instead of id
-                rs.getString("username"),
-                rs.getString("role")
-            );
-            user.setDisplayId(sequenceNumber++);
-            users.add(user);
+    public boolean deleteUser(int userId) throws SQLException {
+        String sql = "DELETE FROM users WHERE id = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("[DEBUG] Successfully deleted user with ID: " + userId);
+                return true;
+            } else {
+                System.out.println("[DEBUG] No user found with ID: " + userId);
+                return false;
+            }
+        } catch (SQLException e) {
+            System.err.println("[ERROR] Failed to delete user with ID: " + userId + " - " + e.getMessage());
+            throw e;
         }
     }
-    return users;
-}
 
-public boolean deleteUser(int userId) throws SQLException {
-    // First verify user exists
-    String checkSql = "SELECT id FROM users WHERE id = ?";
-    String deleteSql = "DELETE FROM users WHERE id = ?";
-    
-    try (Connection conn = DBConnection.getConnection();
-         PreparedStatement checkStmt = conn.prepareStatement(checkSql);
-         PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
-        
-        // Check existence
-        checkStmt.setInt(1, userId);
-        ResultSet rs = checkStmt.executeQuery();
-        if (!rs.next()) {
-            return false; // User doesn't exist
+    public List<User> getAllUsers() throws SQLException {
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT * FROM users";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                User user = new User(rs.getInt("id"), rs.getString("username"), rs.getString("role"));
+                user.setPermissions(rs.getString("permissions"));
+                users.add(user);
+            }
         }
-        
-        // Delete user
-        deleteStmt.setInt(1, userId);
-        return deleteStmt.executeUpdate() > 0;
+        return users;
     }
-}
-
-public void addUser(String username, String password, String role) throws SQLException {
-    String sql = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
-    try (Connection conn = DBConnection.getConnection();
-         PreparedStatement stmt = conn.prepareStatement(sql)) {
-        stmt.setString(1, username);
-        stmt.setString(2, password); // Hash this in production!
-        stmt.setString(3, role);
-        stmt.executeUpdate();
-    }
-}
 }

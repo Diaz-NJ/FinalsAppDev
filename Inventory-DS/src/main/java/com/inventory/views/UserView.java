@@ -2,10 +2,14 @@ package main.java.com.inventory.views;
 
 import main.java.com.inventory.dao.UserDAO;
 import main.java.com.inventory.models.User;
+import main.java.com.inventory.services.SessionManager;
+import main.java.com.inventory.utils.ErrorHandler;
+import main.java.com.inventory.dao.DBConnection;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -13,32 +17,35 @@ public class UserView extends JPanel {
     private JTable userTable;
     private DefaultTableModel tableModel;
 
-    // ADD THIS INTERFACE:
-public interface RegisterCallback {
-    void onRegister(String username, String password, String role);
-}
-    @SuppressWarnings("unused")
+    public interface RegisterCallback {
+        void onRegister(String username, String password, String role);
+    }
+    
     public UserView() {
         setLayout(new BorderLayout());
 
-        // Table setup
         String[] columns = {"ID", "Username", "Role","DB_ID"};
         tableModel = new DefaultTableModel(columns, 0){ 
             @Override
         public boolean isCellEditable(int row, int column) {
-            return false; // Make all cells non-editable
+            return false;
         }};
         userTable = new JTable(tableModel);
         add(new JScrollPane(userTable), BorderLayout.CENTER);
 
-        // Buttons panel
         JPanel buttonPanel = new JPanel();
         JButton addButton = new JButton("Add User");
         JButton deleteButton = new JButton("Delete");
         JButton refreshButton = new JButton("View All");
 
-        addButton.addActionListener(this::showRegisterDialog);
-        deleteButton.addActionListener(this::handleDelete);
+        addButton.addActionListener(e -> {
+            if (hasPermission("addUser")) showRegisterDialog(e);
+            else ErrorHandler.handleError(this, "Permission denied: Add User not allowed");
+        });
+        deleteButton.addActionListener(e -> {
+            if (hasPermission("deleteUser")) handleDelete(e);
+            else ErrorHandler.handleError(this, "Permission denied: Delete User not allowed");
+        });
         refreshButton.addActionListener(e -> refreshTable());
 
         buttonPanel.add(addButton);
@@ -52,36 +59,36 @@ public interface RegisterCallback {
     private void refreshTable() {
         try {
             tableModel.setRowCount(0);
-             tableModel.setColumnCount(0);
+            tableModel.setColumnCount(0);
 
-              String[] columns = {"ID", "Username", "Role", "DB_ID"}; // 4 columns
-        tableModel.setColumnIdentifiers(columns);
+            String[] columns = {"ID", "Username", "Role", "DB_ID"}; 
+            tableModel.setColumnIdentifiers(columns);
 
-            UserDAO userDAO = new UserDAO();
-            List<User> users = userDAO.getAllUsers(); // Add this method to UserDAO
+            Connection conn = DBConnection.getConnection();
+            UserDAO userDAO = new UserDAO(conn);
+            List<User> users = userDAO.getAllUsers();
 
-        for (User user : users) {
-            tableModel.addRow(new Object[] {
-                user.getDisplayId(), // Display position
-                user.getUsername(), 
-                user.getRole(),
-                user.getId() // Hidden actual ID
-            });
+        for (int i = 0; i < users.size(); i++) {
+                User user = users.get(i);
+                user.setDisplayId(i + 1);
+                tableModel.addRow(new Object[] {
+                    user.getDisplayId(),
+                    user.getUsername(), 
+                    user.getRole(),
+                    user.getId()
+                });
+            }
+            userTable.removeColumn(userTable.getColumnModel().getColumn(3));
+            System.out.println("[DEBUG] Refreshed table with " + users.size() + " users");
+        } catch (SQLException e) {
+            ErrorHandler.handleError(this, "Error loading users", e);
         }
-         userTable.removeColumn(userTable.getColumnModel().getColumn(3));
-    } catch (SQLException e) {
-        JOptionPane.showMessageDialog(this, 
-            "Error loading users: " + e.getMessage(), 
-            "Error", 
-            JOptionPane.ERROR_MESSAGE);
     }
-}
 
 private void handleDelete(ActionEvent e) {
     int selectedRow = userTable.getSelectedRow();
     if (selectedRow >= 0) {
-        // Get the actual ID from the hidden column (column 3 in this case)
-        int userIdToDelete = (int) tableModel.getValueAt(selectedRow, 3); // Renamed from actualUserId
+        int userIdToDelete = (int) tableModel.getValueAt(selectedRow, 3);
         String username = (String) tableModel.getValueAt(selectedRow, 1);
         
         int confirm = JOptionPane.showConfirmDialog(
@@ -93,32 +100,36 @@ private void handleDelete(ActionEvent e) {
         
         if (confirm == JOptionPane.YES_OPTION) {
             try {
-                UserDAO userDAO = new UserDAO();
-                boolean success = userDAO.deleteUser(userIdToDelete); // Use actual ID
+                 Connection conn = DBConnection.getConnection();
+                    UserDAO userDAO = new UserDAO(conn);
+                    boolean success = userDAO.deleteUser(userIdToDelete);
                 
                 if (success) {
                     refreshTable();
-                    JOptionPane.showMessageDialog(this, "User deleted successfully");
+                    JOptionPane.showMessageDialog(this, "User deleted successfully",
+                            "Success", JOptionPane.INFORMATION_MESSAGE);
                 } else {
-                    JOptionPane.showMessageDialog(this, 
-                        "Failed to delete user", 
-                        "Error", 
-                        JOptionPane.ERROR_MESSAGE);
+                    ErrorHandler.handleError(this, "No user found with ID: " + userIdToDelete);
                 }
             } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this,
-                    "Database error: " + ex.getMessage(),
-                    "Error",
-                    JOptionPane.ERROR_MESSAGE);
-                ex.printStackTrace();
+                    String message = ex.getMessage().contains("foreign key constraint") ?
+                        "Cannot delete user: They are referenced by another record (e.g., in a related table)" :
+                        "Database error while deleting user";
+                    ErrorHandler.handleError(this, message, ex);
+                }
             }
+        } else {
+            ErrorHandler.handleError(this, "Please select a user first", null);
         }
     }
-}
 
     private void showRegisterDialog(ActionEvent e) {
     RegisterDialog dialog = new RegisterDialog((JFrame)SwingUtilities.getWindowAncestor(this));
-    dialog.setRegisterCallback((username, password, role) -> {
+    dialog.setRegisterCallback((username, password, role, success) -> {
+        if (!success) {
+                return;
+            }
+
         int confirm = JOptionPane.showConfirmDialog(
             dialog,
             "Create new user '" + username + "' with role '" + role + "'?",
@@ -128,17 +139,73 @@ private void handleDelete(ActionEvent e) {
         
         if (confirm == JOptionPane.YES_OPTION) {
             try {
-                UserDAO userDAO = new UserDAO();
-                userDAO.addUser(username, password, role);
-                refreshTable();
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(dialog, 
-                    "Error: " + ex.getMessage(), 
-                    "Registration Failed", 
-                    JOptionPane.ERROR_MESSAGE);
+                Connection conn = DBConnection.getConnection();
+                    UserDAO userDAO = new UserDAO(conn);
+                    boolean addSuccess = userDAO.addUser(username, password, role);
+                    if (addSuccess) {
+                        refreshTable();
+                        JOptionPane.showMessageDialog(this, "User registered successfully!",
+                            "Success", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        ErrorHandler.handleError(dialog, "Failed to add user: " + username);
+                    }
+                } catch (SQLException ex) {
+                    String message = ex.getMessage().contains("Duplicate entry") || 
+                                     ex.getMessage().contains("already exists") ?
+                                     "Username '" + username + "' is already taken" :
+                                     "Database error while registering user";
+                    ErrorHandler.handleError(this, message, ex);
+                }
+            }
+        });
+        dialog.setVisible(true);
+    }
+
+     private void updateButtonStates() {
+        Component[] components = getComponents();
+        for (Component c : components) {
+            if (c instanceof JPanel) {
+                for (Component btn : ((JPanel)c).getComponents()) {
+                    if (btn instanceof JButton) {
+                        JButton button = (JButton) btn;
+                        switch (button.getText()) {
+                            case "Add User":
+                                button.setEnabled(hasPermission("addUser"));
+                                break;
+                            case "Delete":
+                                button.setEnabled(hasPermission("deleteUser"));
+                                break;
+                        }
+                    }
+                }
             }
         }
-    });
-    dialog.setVisible(true);
-}
+    }
+
+    private boolean hasPermission(String permission) {
+        if (SessionManager.getCurrentUser() == null || SessionManager.getCurrentUser().getRole() == null) {
+            System.out.println("[DEBUG] hasPermission: currentUser or role is null");
+            return false;
+        }
+        if (SessionManager.getCurrentUser().getRole().equals("admin")) {
+            System.out.println("[DEBUG] hasPermission: Admin role detected, granting access for " + permission);
+            return true;
+        }
+        String perms = SessionManager.getCurrentUser().getPermissions();
+        if (perms == null || perms.isEmpty()) {
+            System.out.println("[DEBUG] hasPermission: Permissions string is null or empty");
+            return false;
+        }
+        String[] permArray = perms.split(",");
+        for (String perm : permArray) {
+            String[] keyValue = perm.split(":");
+            if (keyValue.length == 2 && keyValue[0].trim().equals(permission)) {
+                boolean hasAccess = keyValue[1].trim().equals("1");
+                System.out.println("[DEBUG] hasPermission: Checking " + permission + " -> " + hasAccess);
+                return hasAccess;
+            }
+        }
+        System.out.println("[DEBUG] hasPermission: Permission " + permission + " not found in permissions string");
+        return false;
+    }
 }

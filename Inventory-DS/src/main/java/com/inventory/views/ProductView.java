@@ -3,6 +3,7 @@ package main.java.com.inventory.views;
 import main.java.com.inventory.dao.ProductDAO;
 import main.java.com.inventory.models.Product;
 import main.java.com.inventory.models.User;
+import main.java.com.inventory.utils.ErrorHandler;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -66,29 +67,41 @@ public class ProductView extends JPanel {
         refreshButton = new JButton("View All");
         lowStockButton = new JButton("Check Low Stock");
 
-        addButton.addActionListener(e -> showProductDialog(null));
-        editButton.addActionListener(e -> editSelectedProduct());
-        deleteButton.addActionListener(e -> deleteSelectedProduct());
+        addButton.addActionListener(e -> {
+            if (hasPermission("add")) showProductDialog(null);
+            else ErrorHandler.handleError(this, "Permission denied: Add not allowed");
+        });
+        editButton.addActionListener(e -> {
+            if (hasPermission("edit")) editSelectedProduct();
+            else ErrorHandler.handleError(this, "Permission denied: Edit not allowed");
+        });
+        deleteButton.addActionListener(e -> {
+            if (hasPermission("delete")) deleteSelectedProduct();
+            else ErrorHandler.handleError(this, "Permission denied: Delete not allowed");
+        });
         refreshButton.addActionListener(e -> refreshTable());
-        lowStockButton.addActionListener(e -> checkLowStock());
-
+        lowStockButton.addActionListener(e -> {
+            if (hasPermission("lowStock")) checkLowStock();
+            else ErrorHandler.handleError(this, "Permission denied: Low Stock check not allowed");
+        });
+        
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
         buttonPanel.add(deleteButton);
         buttonPanel.add(refreshButton);
         buttonPanel.add(lowStockButton);
 
-        refreshButton.setToolTipText("View all products");
-        searchField.setToolTipText("Searches ID first, then name/description");
+        refreshButton.setToolTipText("View all products (Ctrl+R)");
+        searchField.setToolTipText("Searches ID first, then name/description (Ctrl+S)");
+        addButton.setToolTipText("Add new product (Ctrl+A)");
+        editButton.setToolTipText("Edit selected product (Ctrl+E)");
+        deleteButton.setToolTipText("Delete selected product (Ctrl+D)");
         lowStockButton.setToolTipText("Check products with low stock (Ctrl+L)");
 
-        if (!currentUser.getRole().equals("admin")) {
-            editButton.setEnabled(false);
-            deleteButton.setEnabled(false);
-            lowStockButton.setEnabled(false);
-        }
-
+        updateButtonStates();
         add(buttonPanel, BorderLayout.SOUTH);
+        setFocusable(true);
+        requestFocusInWindow();
     }
 
     private void setupKeyBindings() {
@@ -105,12 +118,14 @@ public class ProductView extends JPanel {
         });
 
         // Ctrl+A: Add product
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK), "add");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "add");
         actionMap.put("add", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin")) {
+                if (currentUser.getRole().equals("admin") || hasPermission("add")) {
                     showProductDialog(null);
+                } else {
+                    ErrorHandler.handleError(ProductView.this, "Permission denied: Add not allowed");
                 }
             }
         });
@@ -120,19 +135,23 @@ public class ProductView extends JPanel {
         actionMap.put("edit", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin")) {
+                if (currentUser.getRole().equals("admin") || hasPermission("edit")) {
                     editSelectedProduct();
+                } else {
+                    ErrorHandler.handleError(ProductView.this, "Permission denied: Edit not allowed");
                 }
             }
         });
 
         // Ctrl+D: Delete product
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "delete");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_DOWN_MASK), "delete");
         actionMap.put("delete", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin")) {
+                if (currentUser.getRole().equals("admin") || hasPermission("delete")) {
                     deleteSelectedProduct();
+                } else {
+                    ErrorHandler.handleError(ProductView.this, "Permission denied: Delete not allowed");
                 }
             }
         });
@@ -151,8 +170,10 @@ public class ProductView extends JPanel {
         actionMap.put("lowStock", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin")) {
+                if (currentUser.getRole().equals("admin") || hasPermission("lowStock")) {
                     checkLowStock();
+                } else {
+                    ErrorHandler.handleError(ProductView.this, "Permission denied: Low Stock check not allowed");
                 }
             }
         });
@@ -174,8 +195,7 @@ public class ProductView extends JPanel {
                 });
             } checkLowStockOnRefresh();
         } catch (SQLException e) {
-            System.err.println("Error in refreshTable: " + e.getMessage());
-            showError("Error loading products: " + e.getMessage());
+            ErrorHandler.handleError(this, "Error loading products", e);
         }
     }
 
@@ -192,7 +212,7 @@ public class ProductView extends JPanel {
                     "Low Stock Alert", JOptionPane.WARNING_MESSAGE);
             }
         } catch (SQLException e) {
-            showError("Error checking low stock: " + e.getMessage());
+            ErrorHandler.handleError(this, "Error checking low stock", e);
         }
     }
 
@@ -212,7 +232,7 @@ public class ProductView extends JPanel {
                     "Low Stock Products", JOptionPane.WARNING_MESSAGE);
             }
         } catch (SQLException e) {
-            showError("Error checking low stock: " + e.getMessage());
+            ErrorHandler.handleError(this, "Error checking low stock", e);
         }
     }
 
@@ -238,7 +258,7 @@ public class ProductView extends JPanel {
                 });
             }
         } catch (SQLException e) {
-            showError("Error searching products: " + e.getMessage());
+            ErrorHandler.handleError(this, "Error searching products", e);
         }
     }
 
@@ -272,18 +292,39 @@ public class ProductView extends JPanel {
                 "Confirm " + (product == null ? "Add" : "Update"),
                 JOptionPane.YES_NO_OPTION
             );
-    
+            
             if (confirm != JOptionPane.YES_OPTION) {
                 return;
             }
             try {
+                // Validate inputs
+                String name = nameField.getText().trim();
+                String category = categoryField.getText().trim();
+                String stockText = stockField.getText().trim();
+                String priceText = priceField.getText().trim();
+                String description = descField.getText().trim();
+
+                if (name.isEmpty() || category.isEmpty() || stockText.isEmpty() || priceText.isEmpty()) {
+                    throw new IllegalArgumentException("All fields except description must be filled");
+                }
+
+                int stock = Integer.parseInt(stockText);
+                double price = Double.parseDouble(priceText);
+
+                if (stock < 0) {
+                    throw new IllegalArgumentException("Stock cannot be negative");
+                }
+                if (price < 0) {
+                    throw new IllegalArgumentException("Price cannot be negative");
+                }
+
                 Product editedProduct = new Product(
                     product != null ? product.getId() : 0,
-                    nameField.getText(),
-                    categoryField.getText(),
-                    Integer.parseInt(stockField.getText()),
-                    Double.parseDouble(priceField.getText()),
-                    descField.getText()
+                    name,
+                    category,
+                    stock,
+                    price,
+                    description
                 );
 
                 boolean success;
@@ -297,12 +338,14 @@ public class ProductView extends JPanel {
                     refreshTable();
                     dialog.dispose();
                 } else {
-                    showError("Failed to save product");
+                    throw new SQLException("Failed to save product");
                 }
             } catch (NumberFormatException ex) {
-                showError("Invalid number format");
+                ErrorHandler.handleError(this, "Invalid number format for stock or price", ex);
+            } catch (IllegalArgumentException ex) {
+                ErrorHandler.handleError(this, ex.getMessage(), ex);
             } catch (SQLException ex) {
-                showError("Database error: " + ex.getMessage());
+                ErrorHandler.handleError(this, "Database error while saving product", ex);
             } 
         });
 
@@ -322,10 +365,10 @@ public class ProductView extends JPanel {
                     showProductDialog(product);
                 }
             } catch (SQLException e) {
-                showError("Error loading product: " + e.getMessage());
+                ErrorHandler.handleError(this, "Error loading product", e); 
             }
         } else {
-            showError("Please select a product first");
+            ErrorHandler.handleError(this, "Please select a product first", null);
         }
     }
 
@@ -343,18 +386,39 @@ public class ProductView extends JPanel {
                     if (productDAO.deleteProduct(productId)) {
                         refreshTable();
                     } else {
-                        showError("Failed to delete product");
+                        ErrorHandler.handleError(this, "Failed to delete product", null);
                     }
                 } catch (SQLException e) {
-                    showError("Error deleting product: " + e.getMessage());
+                    ErrorHandler.handleError(this, "Error deleting product", e);
                 }
             }
         } else {
-            showError("Please select a product first");
+            ErrorHandler.handleError(this, "Please select a product first", null);
         }
     }
 
     private void showError(String message) {
         JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+
+    private void updateButtonStates() {
+        addButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("add"));
+        editButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("edit"));
+        deleteButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("delete"));
+        lowStockButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("lowStock"));
+    }
+
+    private boolean hasPermission(String permission) {
+        String perms = currentUser.getPermissions();
+        if (perms == null || perms.isEmpty()) return false;
+        String[] permArray = perms.split(",");
+        for (String perm : permArray) {
+            String[] keyValue = perm.split(":");
+            if (keyValue.length == 2 && keyValue[0].trim().equals(permission) && keyValue[1].trim().equals("1")) {
+                return true;
+            }
+        }
+        return false;
     }
 }

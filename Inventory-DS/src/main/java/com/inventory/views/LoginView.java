@@ -3,9 +3,12 @@ package main.java.com.inventory.views;
 import main.java.com.inventory.models.User;
 import main.java.com.inventory.dao.UserDAO;
 import main.java.com.inventory.services.SessionManager;
+import main.java.com.inventory.utils.ErrorHandler;
+import main.java.com.inventory.dao.DBConnection;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.sql.Connection;
 import java.sql.SQLException;
 
 public class LoginView extends JFrame {
@@ -54,39 +57,31 @@ public class LoginView extends JFrame {
         String password = new String(passwordField.getPassword());
         String role = (String) roleComboBox.getSelectedItem();
 
-        try {
-            // 1. Validate credentials
-            UserDAO userDAO = new UserDAO();
+         try {
+            if (username.isEmpty() || password.isEmpty()) {
+                throw new IllegalArgumentException("Username and password cannot be empty");
+            }
+
+            Connection conn = DBConnection.getConnection();
+            UserDAO userDAO = new UserDAO(conn);
             User authenticatedUser = userDAO.validateUser(username, password, role);
 
             if (authenticatedUser != null) {
-                // 2. Start new session
                 SessionManager.startSession(authenticatedUser);
-                
-                // 3. Close login window
                 this.dispose();
-                
-                // 4. Open dashboard
                 SwingUtilities.invokeLater(() -> {
                     DashboardView dashboard = new DashboardView(SessionManager.getCurrentUser());
                     dashboard.setVisible(true);
                 });
             } else {
-                JOptionPane.showMessageDialog(this,
-                    "Invalid credentials or role mismatch",
-                    "Login Failed",
-                    JOptionPane.ERROR_MESSAGE);
+                throw new SecurityException("Invalid credentials or role mismatch");
             }
         } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this,
-                "Database error: " + ex.getMessage(),
-                "Login Error",
-                JOptionPane.ERROR_MESSAGE);
+            ErrorHandler.handleError(this, "Database error during login", ex);
+        } catch (IllegalArgumentException | SecurityException ex) {
+            ErrorHandler.handleError(this, ex.getMessage(), ex);
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                "Unexpected error: " + ex.getMessage(),
-                "Error",
-                JOptionPane.ERROR_MESSAGE);
+            ErrorHandler.handleError(this, "Unexpected error during login", ex);
         }
     }
 
