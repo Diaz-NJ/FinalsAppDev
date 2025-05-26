@@ -105,7 +105,7 @@ public class ProductView extends JPanel {
         });
 
         // Ctrl+A: Add product
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.CTRL_DOWN_MASK), "add");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK), "add");
         actionMap.put("add", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {

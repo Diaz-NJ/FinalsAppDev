@@ -22,7 +22,7 @@ public interface RegisterCallback {
         setLayout(new BorderLayout());
 
         // Table setup
-        String[] columns = {"#","ID", "Username", "Role","DB_ID"};
+        String[] columns = {"ID", "Username", "Role","DB_ID"};
         tableModel = new DefaultTableModel(columns, 0){ 
             @Override
         public boolean isCellEditable(int row, int column) {
@@ -54,7 +54,7 @@ public interface RegisterCallback {
             tableModel.setRowCount(0);
              tableModel.setColumnCount(0);
 
-              String[] columns = {"#", "Username", "Role", "DB_ID"}; // 4 columns
+              String[] columns = {"ID", "Username", "Role", "DB_ID"}; // 4 columns
         tableModel.setColumnIdentifiers(columns);
 
             UserDAO userDAO = new UserDAO();
