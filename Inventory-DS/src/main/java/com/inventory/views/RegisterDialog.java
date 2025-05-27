@@ -1,8 +1,8 @@
 package main.java.com.inventory.views;
 
 import main.java.com.inventory.dao.UserDAO;
-import main.java.com.inventory.models.User;
 import main.java.com.inventory.utils.ErrorHandler;
+import main.java.com.inventory.utils.ThemeManager;
 import main.java.com.inventory.dao.DBConnection;
 import javax.swing.*;
 import java.awt.*;
@@ -10,7 +10,7 @@ import java.awt.event.ActionEvent;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-public class RegisterDialog extends JDialog {
+public class RegisterDialog extends JDialog implements ThemeManager.ThemeChangeListener {
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JComboBox<String> roleComboBox;
@@ -38,10 +38,11 @@ public class RegisterDialog extends JDialog {
         add(registerButton);
 
         JButton cancelButton = new JButton("Cancel");
-        cancelButton.addActionListener(e -> dispose());
+        cancelButton.addActionListener(_ -> dispose());
         add(cancelButton);
 
         pack();
+        ThemeManager.addThemeChangeListener(this);
     }
 
  public interface RegisterCallback {
@@ -108,4 +109,10 @@ public void setRegisterCallback(RegisterCallback callback) {
             }
         }
     }
+        @Override
+    public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
+        System.out.println("[DEBUG] RegisterDialog: Theme changed to " + newTheme);
+        SwingUtilities.updateComponentTreeUI(this);
+    }
 }
+    

@@ -21,14 +21,4 @@ public class DBConnection {
             throw new SQLException("MySQL JDBC Driver not found!", e);
         }
     }
-
-    // Test the connection (optional)
-    public static void main(String[] args) {
-        try (@SuppressWarnings("unused")
-        Connection conn = DBConnection.getConnection()) {
-            System.out.println("✅ Database connected successfully!");
-        } catch (SQLException e) {
-            System.err.println("❌ Connection failed: " + e.getMessage());
-        }
-    }
 }

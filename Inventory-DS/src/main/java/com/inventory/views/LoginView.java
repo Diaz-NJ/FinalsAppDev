@@ -3,6 +3,7 @@ package main.java.com.inventory.views;
 import main.java.com.inventory.models.User;
 import main.java.com.inventory.dao.UserDAO;
 import main.java.com.inventory.services.SessionManager;
+import main.java.com.inventory.utils.ThemeManager;
 import main.java.com.inventory.utils.ErrorHandler;
 import main.java.com.inventory.dao.DBConnection;
 import javax.swing.*;
@@ -11,13 +12,14 @@ import java.awt.event.ActionEvent;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-public class LoginView extends JFrame {
+public class LoginView extends JFrame implements ThemeManager.ThemeChangeListener {
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JComboBox<String> roleComboBox;
 
     public LoginView() {
         initializeUI();
+        ThemeManager.addThemeChangeListener(this);
     }
 
     private void initializeUI() {
@@ -29,22 +31,18 @@ public class LoginView extends JFrame {
         JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Username
         panel.add(new JLabel("Username:"));
         usernameField = new JTextField();
         panel.add(usernameField);
 
-        // Password
         panel.add(new JLabel("Password:"));
         passwordField = new JPasswordField();
         panel.add(passwordField);
 
-        // Role
         panel.add(new JLabel("Role:"));
         roleComboBox = new JComboBox<>(new String[]{"User", "Admin"});
         panel.add(roleComboBox);
 
-        // Login Button
         JButton loginButton = new JButton("Login");
         loginButton.addActionListener(this::handleLogin);
         panel.add(loginButton);
@@ -85,11 +83,9 @@ public class LoginView extends JFrame {
         }
     }
 
-    public static void main(String[] args) {
-        // Ensure UI runs on Event Dispatch Thread
-        SwingUtilities.invokeLater(() -> {
-            LoginView loginView = new LoginView();
-            loginView.setVisible(true);
-        });
+@Override
+    public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
+        System.out.println("[DEBUG] LoginView: Theme changed to " + newTheme);
+        SwingUtilities.updateComponentTreeUI(this);
     }
 }

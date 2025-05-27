@@ -4,6 +4,7 @@ import main.java.com.inventory.dao.ProductDAO;
 import main.java.com.inventory.models.Product;
 import main.java.com.inventory.models.User;
 import main.java.com.inventory.utils.ErrorHandler;
+import main.java.com.inventory.utils.ThemeManager;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -13,7 +14,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ProductView extends JPanel {
+public class ProductView extends JPanel implements ThemeManager.ThemeChangeListener {
     private JTable productTable;
     private DefaultTableModel tableModel;
     private User currentUser;
@@ -29,6 +30,7 @@ public class ProductView extends JPanel {
         setupKeyBindings();
         initializeUI();
         refreshTable();
+        ThemeManager.addThemeChangeListener(this);
     }
 
     private void initializeUI() {
@@ -67,20 +69,20 @@ public class ProductView extends JPanel {
         refreshButton = new JButton("View All");
         lowStockButton = new JButton("Check Low Stock");
 
-        addButton.addActionListener(e -> {
+        addButton.addActionListener(_ -> {
             if (hasPermission("add")) showProductDialog(null);
             else ErrorHandler.handleError(this, "Permission denied: Add not allowed");
         });
-        editButton.addActionListener(e -> {
+        editButton.addActionListener(_ -> {
             if (hasPermission("edit")) editSelectedProduct();
             else ErrorHandler.handleError(this, "Permission denied: Edit not allowed");
         });
-        deleteButton.addActionListener(e -> {
+        deleteButton.addActionListener(_ -> {
             if (hasPermission("delete")) deleteSelectedProduct();
             else ErrorHandler.handleError(this, "Permission denied: Delete not allowed");
         });
-        refreshButton.addActionListener(e -> refreshTable());
-        lowStockButton.addActionListener(e -> {
+        refreshButton.addActionListener(_ -> refreshTable());
+        lowStockButton.addActionListener(_ -> {
             if (hasPermission("lowStock")) checkLowStock();
             else ErrorHandler.handleError(this, "Permission denied: Low Stock check not allowed");
         });
@@ -193,13 +195,14 @@ public class ProductView extends JPanel {
                     product.getDescription(),
                     product.getId() // Store actual ID in hidden column
                 });
-            } checkLowStockOnRefresh();
+            }
+            checkLowStockOnRefresh();
         } catch (SQLException e) {
             ErrorHandler.handleError(this, "Error loading products", e);
         }
     }
 
-        private void checkLowStockOnRefresh() {
+    private void checkLowStockOnRefresh() {
         try {
             List<Product> lowStockProducts = productDAO.getLowStockProducts(LOW_STOCK_THRESHOLD);
             if (!lowStockProducts.isEmpty()) {
@@ -208,6 +211,7 @@ public class ProductView extends JPanel {
                     message.append(String.format("ID: %d, Name: %s, Stock: %d\n",
                         product.getId(), product.getName(), product.getStock()));
                 }
+                ThemeManager.setTheme(ThemeManager.getCurrentTheme());
                 JOptionPane.showMessageDialog(this, message.toString(),
                     "Low Stock Alert", JOptionPane.WARNING_MESSAGE);
             }
@@ -220,6 +224,7 @@ public class ProductView extends JPanel {
         try {
             List<Product> lowStockProducts = productDAO.getLowStockProducts(LOW_STOCK_THRESHOLD);
             if (lowStockProducts.isEmpty()) {
+                ThemeManager.setTheme(ThemeManager.getCurrentTheme());
                 JOptionPane.showMessageDialog(this, "No products with low stock.",
                     "Low Stock Check", JOptionPane.INFORMATION_MESSAGE);
             } else {
@@ -228,6 +233,7 @@ public class ProductView extends JPanel {
                     message.append(String.format("ID: %d, Name: %s, Stock: %d\n",
                         product.getId(), product.getName(), product.getStock()));
                 }
+                ThemeManager.setTheme(ThemeManager.getCurrentTheme());
                 JOptionPane.showMessageDialog(this, message.toString(),
                     "Low Stock Products", JOptionPane.WARNING_MESSAGE);
             }
@@ -262,30 +268,62 @@ public class ProductView extends JPanel {
         }
     }
 
-    private void showProductDialog(Product product) {
-        JDialog dialog = new JDialog();
-        dialog.setTitle(product == null ? "Add Product" : "Edit Product");
-        dialog.setLayout(new GridLayout(6, 2, 10, 10));
+    private class ProductDialog extends JDialog implements ThemeManager.ThemeChangeListener {
+        private JTextField nameField, categoryField, stockField, priceField, descField;
+        private JButton saveButton;
 
-        JTextField nameField = new JTextField(product != null ? product.getName() : "");
-        JTextField categoryField = new JTextField(product != null ? product.getCategoryName() : "");
-        JTextField stockField = new JTextField(product != null ? String.valueOf(product.getStock()) : "");
-        JTextField priceField = new JTextField(product != null ? String.valueOf(product.getPrice()) : "");
-        JTextField descField = new JTextField(product != null ? product.getDescription() : "");
+        public ProductDialog(Product product) {
+            super(SwingUtilities.getWindowAncestor(ProductView.this), 
+                  product == null ? "Add Product" : "Edit Product", 
+                  Dialog.ModalityType.APPLICATION_MODAL);
+            setLayout(new GridLayout(6, 2, 10, 10));
 
-        dialog.add(new JLabel("Name:"));
-        dialog.add(nameField);
-        dialog.add(new JLabel("Category:"));
-        dialog.add(categoryField);
-        dialog.add(new JLabel("Stock:"));
-        dialog.add(stockField);
-        dialog.add(new JLabel("Price:"));
-        dialog.add(priceField);
-        dialog.add(new JLabel("Description:"));
-        dialog.add(descField);
+            nameField = new JTextField(product != null ? product.getName() : "");
+            categoryField = new JTextField(product != null ? product.getCategoryName() : "");
+            stockField = new JTextField(product != null ? String.valueOf(product.getStock()) : "");
+            priceField = new JTextField(product != null ? String.valueOf(product.getPrice()) : "");
+            descField = new JTextField(product != null ? product.getDescription() : "");
+            saveButton = new JButton("Save");
 
-        JButton saveButton = new JButton("Save");
-        saveButton.addActionListener(e -> {
+            add(new JLabel("Name:"));
+            add(nameField);
+            add(new JLabel("Category:"));
+            add(categoryField);
+            add(new JLabel("Stock:"));
+            add(stockField);
+            add(new JLabel("Price:"));
+            add(priceField);
+            add(new JLabel("Description:"));
+            add(descField);
+            add(saveButton);
+
+            saveButton.addActionListener(_ -> saveProduct(product));
+
+            // Apply initial theme
+            ThemeManager.applyThemeToComponent(this);
+            applyThemeToComponents();
+            ThemeManager.addThemeChangeListener(this);
+
+            pack();
+            setLocationRelativeTo(ProductView.this);
+        }
+
+        private void applyThemeToComponents() {
+            ThemeManager.applyThemeToComponent(nameField);
+            ThemeManager.applyThemeToComponent(categoryField);
+            ThemeManager.applyThemeToComponent(stockField);
+            ThemeManager.applyThemeToComponent(priceField);
+            ThemeManager.applyThemeToComponent(descField);
+            ThemeManager.applyThemeToComponent(saveButton);
+            for (Component comp : getContentPane().getComponents()) {
+                if (comp instanceof JLabel) {
+                    ThemeManager.applyThemeToComponent(comp);
+                }
+            }
+            System.out.println("[DEBUG] ProductDialog applied theme - Background: " + getBackground());
+        }
+
+        private void saveProduct(Product product) {
             int confirm = JOptionPane.showConfirmDialog(
                 this,
                 "Are you sure you want to " + (product == null ? "add" : "update") + " this product?",
@@ -336,7 +374,7 @@ public class ProductView extends JPanel {
 
                 if (success) {
                     refreshTable();
-                    dialog.dispose();
+                    dispose();
                 } else {
                     throw new SQLException("Failed to save product");
                 }
@@ -346,12 +384,22 @@ public class ProductView extends JPanel {
                 ErrorHandler.handleError(this, ex.getMessage(), ex);
             } catch (SQLException ex) {
                 ErrorHandler.handleError(this, "Database error while saving product", ex);
-            } 
-        });
+            }
+        }
 
-        dialog.add(saveButton);
-        dialog.pack();
-        dialog.setLocationRelativeTo(this);
+        @Override
+        public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
+            System.out.println("[DEBUG] ProductDialog: Theme changed to " + newTheme);
+            SwingUtilities.updateComponentTreeUI(this);
+            applyThemeToComponents();
+            repaint();
+            revalidate();
+            System.out.println("[DEBUG] ProductDialog updated - Background: " + getBackground());
+        }
+    }
+
+    private void showProductDialog(Product product) {
+        ProductDialog dialog = new ProductDialog(product);
         dialog.setVisible(true);
     }
 
@@ -397,11 +445,6 @@ public class ProductView extends JPanel {
         }
     }
 
-    private void showError(String message) {
-        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
-    }
-
-
     private void updateButtonStates() {
         addButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("add"));
         editButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("edit"));
@@ -420,5 +463,35 @@ public class ProductView extends JPanel {
             }
         }
         return false;
+    }
+
+    @Override
+    public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
+        System.out.println("[DEBUG] ProductView: Theme changed to " + newTheme);
+        SwingUtilities.updateComponentTreeUI(this);
+        productTable.setBackground(newTheme == ThemeManager.ThemeMode.LIGHT ? 
+            ThemeManager.LIGHT_COLORS.get("Table.background") : ThemeManager.DARK_COLORS.get("Table.background"));
+        productTable.setForeground(newTheme == ThemeManager.ThemeMode.LIGHT ? 
+            ThemeManager.LIGHT_COLORS.get("Table.foreground") : ThemeManager.DARK_COLORS.get("Table.foreground"));
+        applyThemeToComponents();
+        repaint();
+        revalidate();
+        System.out.println("[DEBUG] ProductView background after update: " + getBackground());
+    }
+
+    private void applyThemeToComponents() {
+        ThemeManager.applyThemeToComponent(this);
+        ThemeManager.applyThemeToComponent(searchField);
+        for (Component comp : getComponents()) {
+            if (comp instanceof JPanel) {
+                JPanel panel = (JPanel) comp;
+                panel.setBackground(ThemeManager.getCurrentTheme() == ThemeManager.ThemeMode.LIGHT ?
+                    ThemeManager.LIGHT_COLORS.get("Panel.background") : ThemeManager.DARK_COLORS.get("Panel.background"));
+                for (Component subComp : panel.getComponents()) {
+                    ThemeManager.applyThemeToComponent(subComp);
+                }
+            }
+        }
+        System.out.println("[DEBUG] ProductView applied theme - Background: " + getBackground());
     }
 }
