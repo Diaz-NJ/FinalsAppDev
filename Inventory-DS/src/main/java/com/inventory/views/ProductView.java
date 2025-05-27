@@ -46,7 +46,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         searchPanel.add(searchField);
         add(searchPanel, BorderLayout.NORTH);
 
-        // Table setup
         String[] columns = {"ID", "Name", "Category", "Stock", "Price", "Description", "DB_ID"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -86,7 +85,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             if (hasPermission("lowStock")) checkLowStock();
             else ErrorHandler.handleError(this, "Permission denied: Low Stock check not allowed");
         });
-        
+
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
         buttonPanel.add(deleteButton);
@@ -110,7 +109,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         InputMap inputMap = getInputMap(WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = getActionMap();
 
-        // Ctrl+S: Focus search field
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK), "search");
         actionMap.put("search", new AbstractAction() {
             @Override
@@ -119,7 +117,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
         });
 
-        // Ctrl+A: Add product
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "add");
         actionMap.put("add", new AbstractAction() {
             @Override
@@ -132,7 +129,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
         });
 
-        // Ctrl+E: Edit product
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK), "edit");
         actionMap.put("edit", new AbstractAction() {
             @Override
@@ -145,7 +141,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
         });
 
-        // Ctrl+D: Delete product
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_DOWN_MASK), "delete");
         actionMap.put("delete", new AbstractAction() {
             @Override
@@ -158,7 +153,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
         });
 
-        // Ctrl+R: Refresh table
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK), "refresh");
         actionMap.put("refresh", new AbstractAction() {
             @Override
@@ -167,7 +161,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
         });
 
-        // Ctrl+L: Check low stock
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK), "lowStock");
         actionMap.put("lowStock", new AbstractAction() {
             @Override
@@ -193,7 +186,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     product.getStock() == null ? 0 : product.getStock(),
                     String.format("₱%.2f", product.getPrice()),
                     product.getDescription(),
-                    product.getId() // Store actual ID in hidden column
+                    product.getId()
                 });
             }
             checkLowStockOnRefresh();
@@ -211,9 +204,10 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     message.append(String.format("ID: %d, Name: %s, Stock: %d\n",
                         product.getId(), product.getName(), product.getStock()));
                 }
-                ThemeManager.setTheme(ThemeManager.getCurrentTheme());
-                JOptionPane.showMessageDialog(this, message.toString(),
-                    "Low Stock Alert", JOptionPane.WARNING_MESSAGE);
+                JOptionPane optionPane = new JOptionPane(message.toString(), JOptionPane.WARNING_MESSAGE);
+                ThemeManager.applyThemeToOptionPane(optionPane);
+                JDialog dialog = optionPane.createDialog(this, "Low Stock Alert");
+                dialog.setVisible(true);
             }
         } catch (SQLException e) {
             ErrorHandler.handleError(this, "Error checking low stock", e);
@@ -224,18 +218,20 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         try {
             List<Product> lowStockProducts = productDAO.getLowStockProducts(LOW_STOCK_THRESHOLD);
             if (lowStockProducts.isEmpty()) {
-                ThemeManager.setTheme(ThemeManager.getCurrentTheme());
-                JOptionPane.showMessageDialog(this, "No products with low stock.",
-                    "Low Stock Check", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane optionPane = new JOptionPane("No products with low stock.", JOptionPane.INFORMATION_MESSAGE);
+                ThemeManager.applyThemeToOptionPane(optionPane);
+                JDialog dialog = optionPane.createDialog(this, "Low Stock Check");
+                dialog.setVisible(true);
             } else {
                 StringBuilder message = new StringBuilder("Low stock products:\n");
                 for (Product product : lowStockProducts) {
                     message.append(String.format("ID: %d, Name: %s, Stock: %d\n",
                         product.getId(), product.getName(), product.getStock()));
                 }
-                ThemeManager.setTheme(ThemeManager.getCurrentTheme());
-                JOptionPane.showMessageDialog(this, message.toString(),
-                    "Low Stock Products", JOptionPane.WARNING_MESSAGE);
+                JOptionPane optionPane = new JOptionPane(message.toString(), JOptionPane.WARNING_MESSAGE);
+                ThemeManager.applyThemeToOptionPane(optionPane);
+                JDialog dialog = optionPane.createDialog(this, "Low Stock Products");
+                dialog.setVisible(true);
             }
         } catch (SQLException e) {
             ErrorHandler.handleError(this, "Error checking low stock", e);
@@ -260,7 +256,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     product.getStock(),
                     String.format("₱%.2f", product.getPrice()),
                     product.getDescription(),
-                    product.getId() // Store actual ID in hidden column
+                    product.getId()
                 });
             }
         } catch (SQLException e) {
@@ -299,7 +295,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
 
             saveButton.addActionListener(_ -> saveProduct(product));
 
-            // Apply initial theme
             ThemeManager.applyThemeToComponent(this);
             applyThemeToComponents();
             ThemeManager.addThemeChangeListener(this);
@@ -324,18 +319,20 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         }
 
         private void saveProduct(Product product) {
-            int confirm = JOptionPane.showConfirmDialog(
-                this,
+            JOptionPane optionPane = new JOptionPane(
                 "Are you sure you want to " + (product == null ? "add" : "update") + " this product?",
-                "Confirm " + (product == null ? "Add" : "Update"),
+                JOptionPane.QUESTION_MESSAGE,
                 JOptionPane.YES_NO_OPTION
             );
-            
-            if (confirm != JOptionPane.YES_OPTION) {
+            ThemeManager.applyThemeToOptionPane(optionPane);
+            JDialog dialog = optionPane.createDialog(this, "Confirm " + (product == null ? "Add" : "Update"));
+            dialog.setVisible(true);
+            Object selectedValue = optionPane.getValue();
+            if (selectedValue == null || !selectedValue.equals(JOptionPane.YES_OPTION)) {
                 return;
             }
+
             try {
-                // Validate inputs
                 String name = nameField.getText().trim();
                 String category = categoryField.getText().trim();
                 String stockText = stockField.getText().trim();
@@ -406,7 +403,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     private void editSelectedProduct() {
         int selectedRow = productTable.getSelectedRow();
         if (selectedRow >= 0) {
-            int productId = (int) tableModel.getValueAt(selectedRow, 6); // Use hidden DB_ID column
+            int productId = (int) tableModel.getValueAt(selectedRow, 6);
             try {
                 Product product = productDAO.getProduct(productId);
                 if (product != null) {
@@ -423,22 +420,28 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     private void deleteSelectedProduct() {
         int selectedRow = productTable.getSelectedRow();
         if (selectedRow >= 0) {
-            int confirm = JOptionPane.showConfirmDialog(this,
+            JOptionPane optionPane = new JOptionPane(
                 "Are you sure you want to delete this product?",
-                "Confirm Delete",
-                JOptionPane.YES_NO_OPTION);
-            
-            if (confirm == JOptionPane.YES_OPTION) {
-                int productId = (int) tableModel.getValueAt(selectedRow, 6); // Use hidden DB_ID column
-                try {
-                    if (productDAO.deleteProduct(productId)) {
-                        refreshTable();
-                    } else {
-                        ErrorHandler.handleError(this, "Failed to delete product", null);
-                    }
-                } catch (SQLException e) {
-                    ErrorHandler.handleError(this, "Error deleting product", e);
+                JOptionPane.QUESTION_MESSAGE,
+                JOptionPane.YES_NO_OPTION
+            );
+            ThemeManager.applyThemeToOptionPane(optionPane);
+            JDialog dialog = optionPane.createDialog(this, "Confirm Delete");
+            dialog.setVisible(true);
+            Object selectedValue = optionPane.getValue();
+            if (selectedValue == null || !selectedValue.equals(JOptionPane.YES_OPTION)) {
+                return;
+            }
+
+            int productId = (int) tableModel.getValueAt(selectedRow, 6);
+            try {
+                if (productDAO.deleteProduct(productId)) {
+                    refreshTable();
+                } else {
+                    ErrorHandler.handleError(this, "Failed to delete product", null);
                 }
+            } catch (SQLException e) {
+                ErrorHandler.handleError(this, "Error deleting product", e);
             }
         } else {
             ErrorHandler.handleError(this, "Please select a product first", null);

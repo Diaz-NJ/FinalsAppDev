@@ -48,6 +48,15 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
         panel.add(loginButton);
 
         add(panel);
+
+        // Apply theme to all components
+        ThemeManager.applyThemeToComponent(this);
+        ThemeManager.applyThemeToComponent(panel);
+        ThemeManager.applyThemeToComponent(usernameField);
+        ThemeManager.applyThemeToComponent(passwordField);
+        ThemeManager.applyThemeToComponent(roleComboBox);
+        ThemeManager.applyThemeToComponent(loginButton);
+        SwingUtilities.updateComponentTreeUI(this);
     }
 
     private void handleLogin(ActionEvent e) {
@@ -55,7 +64,7 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
         String password = new String(passwordField.getPassword());
         String role = (String) roleComboBox.getSelectedItem();
 
-         try {
+        try {
             if (username.isEmpty() || password.isEmpty()) {
                 throw new IllegalArgumentException("Username and password cannot be empty");
             }
@@ -83,9 +92,10 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
         }
     }
 
-@Override
+    @Override
     public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
         System.out.println("[DEBUG] LoginView: Theme changed to " + newTheme);
         SwingUtilities.updateComponentTreeUI(this);
+        ThemeManager.applyThemeToComponent(this);
     }
 }

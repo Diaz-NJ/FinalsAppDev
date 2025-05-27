@@ -24,9 +24,8 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
     public DashboardView(User user) {
         this.currentUser = user;
         try {
-            // Initialize database connection
             this.conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/inventory_ds", "username", "password");
-            ThemeManager.setTheme(ThemeManager.ThemeMode.DARK); // Set initial theme
+            ThemeManager.setTheme(ThemeManager.ThemeMode.DARK);
             initializeUI();
             setupWindowListener();
             ThemeManager.addThemeChangeListener(this);
@@ -83,35 +82,37 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
 
     private void confirmAndExit() {
         try {
-            ThemeManager.setTheme(ThemeManager.getCurrentTheme()); // Reapply theme
-            int confirm = JOptionPane.showConfirmDialog(
-                this,
+            JOptionPane optionPane = new JOptionPane(
                 "Logout from " + currentUser.getUsername() + "?",
-                "Confirm Logout",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE
+                JOptionPane.QUESTION_MESSAGE,
+                JOptionPane.YES_NO_OPTION
             );
-
-            if (confirm == JOptionPane.YES_OPTION) {
-                User userToLogout = currentUser;
-                dispose();
-                
-                if (userToLogout != null) {
-                    SessionManager.clearSession(userToLogout);
-                }
-
-                EventQueue.invokeLater(() -> {
-                    try {
-                        new LoginView().setVisible(true);
-                    } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(null,
-                            "Application restart failed. Please relaunch.\nError: " + ex.getMessage(),
-                            "Fatal Error",
-                            JOptionPane.ERROR_MESSAGE);
-                        System.exit(1);
-                    }
-                });
+            ThemeManager.applyThemeToOptionPane(optionPane);
+            JDialog dialog = optionPane.createDialog(this, "Confirm Logout");
+            dialog.setVisible(true);
+            Object selectedValue = optionPane.getValue();
+            if (selectedValue == null || !selectedValue.equals(JOptionPane.YES_OPTION)) {
+                return;
             }
+
+            User userToLogout = currentUser;
+            dispose();
+            
+            if (userToLogout != null) {
+                SessionManager.clearSession(userToLogout);
+            }
+
+            EventQueue.invokeLater(() -> {
+                try {
+                    new LoginView().setVisible(true);
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(null,
+                        "Application restart failed. Please relaunch.\nError: " + ex.getMessage(),
+                        "Fatal Error",
+                        JOptionPane.ERROR_MESSAGE);
+                    System.exit(1);
+                }
+            });
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this,
                 "Logout process failed: " + ex.getMessage(),

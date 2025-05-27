@@ -57,21 +57,47 @@ public class ThemeManager {
     }
 
     public static void setTheme(ThemeMode theme) {
+        if (currentTheme == theme) {
+            System.out.println("[DEBUG] Theme already set to: " + theme + ", skipping update");
+            return;
+        }
+
         System.out.println("[DEBUG] Setting theme to: " + theme);
         currentTheme = theme;
         Map<String, Color> colors = (theme == ThemeMode.LIGHT) ? LIGHT_COLORS : DARK_COLORS;
 
-        // Apply colors to UIManager
-        for (Map.Entry<String, Color> entry : colors.entrySet()) {
-            UIManager.put(entry.getKey(), entry.getValue());
-            System.out.println("[DEBUG] Applied " + entry.getKey() + " = " + entry.getValue());
+        // Apply generic UIManager properties
+        UIManager.put("Panel.background", colors.get("Panel.background"));
+        UIManager.put("Button.background", colors.get("Button.background"));
+        UIManager.put("Button.foreground", colors.get("Button.foreground"));
+        UIManager.put("TextField.background", colors.get("TextField.background"));
+        UIManager.put("TextField.foreground", colors.get("TextField.foreground"));
+        UIManager.put("ComboBox.background", colors.get("ComboBox.background"));
+        UIManager.put("ComboBox.foreground", colors.get("ComboBox.foreground"));
+        UIManager.put("OptionPane.background", colors.get("OptionPane.background"));
+        UIManager.put("OptionPane.foreground", colors.get("OptionPane.foreground"));
+
+        // Apply Nimbus-specific properties only if Nimbus is active
+        LookAndFeel currentLookAndFeel = UIManager.getLookAndFeel();
+        if (currentLookAndFeel != null && currentLookAndFeel.getClass().getName().equals("javax.swing.plaf.nimbus.NimbusLookAndFeel")) {
+            UIManager.put("control", colors.get("Panel.background"));
+            UIManager.put("nimbusBase", colors.get("Button.background"));
+            UIManager.put("nimbusBlueGrey", colors.get("Button.background"));
+            UIManager.put("text", colors.get("Button.foreground"));
+            System.out.println("[DEBUG] Applied Nimbus-specific UIManager properties");
+        } else {
+            System.out.println("[DEBUG] NimbusLookAndFeel not active, skipping Nimbus-specific properties");
         }
 
-        // Force update of all UI components, including dialogs
+        // Force update of all UI components
         for (Frame frame : Frame.getFrames()) {
             SwingUtilities.updateComponentTreeUI(frame);
+            for (Window window : frame.getOwnedWindows()) {
+                SwingUtilities.updateComponentTreeUI(window);
+            }
             frame.repaint();
             frame.revalidate();
+            System.out.println("[DEBUG] Updated frame: " + frame.getClass().getSimpleName());
         }
 
         // Notify all listeners
@@ -87,6 +113,7 @@ public class ThemeManager {
     public static void addThemeChangeListener(ThemeChangeListener listener) {
         if (!listeners.contains(listener)) {
             listeners.add(listener);
+            System.out.println("[DEBUG] Added theme change listener: " + listener.getClass().getSimpleName());
         }
     }
 
@@ -96,6 +123,12 @@ public class ThemeManager {
             JFrame frame = (JFrame) component;
             frame.getContentPane().setBackground(colors.get("Panel.background"));
             for (Component child : frame.getContentPane().getComponents()) {
+                applyThemeToComponent(child);
+            }
+        } else if (component instanceof JDialog) {
+            JDialog dialog = (JDialog) component;
+            dialog.getContentPane().setBackground(colors.get("Dialog.background"));
+            for (Component child : dialog.getContentPane().getComponents()) {
                 applyThemeToComponent(child);
             }
         } else if (component instanceof JToolBar) {
@@ -113,6 +146,9 @@ public class ThemeManager {
             }
         } else if (component instanceof JPanel) {
             component.setBackground(colors.get("Panel.background"));
+            for (Component child : ((JPanel) component).getComponents()) {
+                applyThemeToComponent(child);
+            }
         } else if (component instanceof JButton) {
             component.setBackground(colors.get("Button.background"));
             component.setForeground(colors.get("Button.foreground"));
@@ -124,10 +160,30 @@ public class ThemeManager {
         } else if (component instanceof JComboBox) {
             component.setBackground(colors.get("ComboBox.background"));
             component.setForeground(colors.get("ComboBox.foreground"));
+            ((JComboBox<?>) component).setOpaque(true);
         }
         SwingUtilities.updateComponentTreeUI(component);
         component.repaint();
         component.revalidate();
+    }
+
+    public static void applyThemeToOptionPane(JOptionPane optionPane) {
+        Map<String, Color> colors = (currentTheme == ThemeMode.LIGHT) ? LIGHT_COLORS : DARK_COLORS;
+        optionPane.setBackground(colors.get("OptionPane.background"));
+        optionPane.setForeground(colors.get("OptionPane.foreground"));
+        for (Component comp : optionPane.getComponents()) {
+            if (comp instanceof JPanel) {
+                comp.setBackground(colors.get("OptionPane.background"));
+                for (Component subComp : ((JPanel) comp).getComponents()) {
+                    if (subComp instanceof JButton) {
+                        subComp.setBackground(colors.get("Button.background"));
+                        subComp.setForeground(colors.get("Button.foreground"));
+                    } else if (subComp instanceof JLabel) {
+                        subComp.setForeground(colors.get("OptionPane.foreground"));
+                    }
+                }
+            }
+        }
     }
 
     public interface ThemeChangeListener {
