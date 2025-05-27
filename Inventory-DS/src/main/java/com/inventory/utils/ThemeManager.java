@@ -23,10 +23,10 @@ public class ThemeManager {
         LIGHT_COLORS.put("TextField.background", Color.WHITE);
         LIGHT_COLORS.put("TextField.foreground", Color.BLACK);
         LIGHT_COLORS.put("Table.background", new Color(255, 255, 255));
-        LIGHT_COLORS.put("Table.foreground", new Color(0, 0, 0)); // Pure black for better contrast
-        LIGHT_COLORS.put("Table.gridColor", new Color(180, 180, 180)); // Slightly darker grid for visibility
+        LIGHT_COLORS.put("Table.foreground", new Color(0, 0, 0));
+        LIGHT_COLORS.put("Table.gridColor", new Color(180, 180, 180));
         LIGHT_COLORS.put("TabbedPane.background", new Color(220, 220, 220));
-        LIGHT_COLORS.put("TabbedPane.foreground", new Color(0, 0, 0)); // Pure black for better contrast
+        LIGHT_COLORS.put("TabbedPane.foreground", new Color(0, 0, 0));
         LIGHT_COLORS.put("ToolBar.background", new Color(230, 230, 230));
         LIGHT_COLORS.put("ScrollPane.background", new Color(240, 240, 240));
         LIGHT_COLORS.put("Dialog.background", new Color(240, 240, 240));
@@ -34,6 +34,8 @@ public class ThemeManager {
         LIGHT_COLORS.put("OptionPane.foreground", Color.BLACK);
         LIGHT_COLORS.put("ComboBox.background", Color.WHITE);
         LIGHT_COLORS.put("ComboBox.foreground", Color.BLACK);
+        LIGHT_COLORS.put("ComboBox.selectionBackground", new Color(184, 207, 229));
+        LIGHT_COLORS.put("ComboBox.selectionForeground", Color.BLACK);
 
         // Define dark theme colors
         DARK_COLORS.put("Panel.background", new Color(40, 40, 40));
@@ -43,10 +45,10 @@ public class ThemeManager {
         DARK_COLORS.put("TextField.background", new Color(60, 60, 60));
         DARK_COLORS.put("TextField.foreground", Color.WHITE);
         DARK_COLORS.put("Table.background", new Color(50, 50, 50));
-        DARK_COLORS.put("Table.foreground", new Color(230, 230, 230)); // Brighter off-white for better readability
-        DARK_COLORS.put("Table.gridColor", new Color(100, 100, 100)); // Lighter grid for visibility
+        DARK_COLORS.put("Table.foreground", new Color(230, 230, 230));
+        DARK_COLORS.put("Table.gridColor", new Color(100, 100, 100));
         DARK_COLORS.put("TabbedPane.background", new Color(30, 30, 30));
-        DARK_COLORS.put("TabbedPane.foreground", new Color(200, 200, 200)); // Slightly dimmer white for tabs to reduce glare
+        DARK_COLORS.put("TabbedPane.foreground", new Color(200, 200, 200));
         DARK_COLORS.put("ToolBar.background", new Color(50, 50, 50));
         DARK_COLORS.put("ScrollPane.background", new Color(40, 40, 40));
         DARK_COLORS.put("Dialog.background", new Color(40, 40, 40));
@@ -54,6 +56,8 @@ public class ThemeManager {
         DARK_COLORS.put("OptionPane.foreground", Color.WHITE);
         DARK_COLORS.put("ComboBox.background", new Color(60, 60, 60));
         DARK_COLORS.put("ComboBox.foreground", Color.WHITE);
+        DARK_COLORS.put("ComboBox.selectionBackground", new Color(80, 80, 80));
+        DARK_COLORS.put("ComboBox.selectionForeground", Color.WHITE);
     }
 
     public static void setTheme(ThemeMode theme) {
@@ -74,6 +78,8 @@ public class ThemeManager {
         UIManager.put("TextField.foreground", colors.get("TextField.foreground"));
         UIManager.put("ComboBox.background", colors.get("ComboBox.background"));
         UIManager.put("ComboBox.foreground", colors.get("ComboBox.foreground"));
+        UIManager.put("ComboBox.selectionBackground", colors.get("ComboBox.selectionBackground"));
+        UIManager.put("ComboBox.selectionForeground", colors.get("ComboBox.selectionForeground"));
         UIManager.put("OptionPane.background", colors.get("OptionPane.background"));
         UIManager.put("OptionPane.foreground", colors.get("OptionPane.foreground"));
 
@@ -84,6 +90,8 @@ public class ThemeManager {
             UIManager.put("nimbusBase", colors.get("Button.background"));
             UIManager.put("nimbusBlueGrey", colors.get("Button.background"));
             UIManager.put("text", colors.get("Button.foreground"));
+            UIManager.put("ComboBox:\"ComboBox.renderer\"[Selected].background", colors.get("ComboBox.selectionBackground"));
+            UIManager.put("ComboBox:\"ComboBox.renderer\"[Selected].textForeground", colors.get("ComboBox.selectionForeground"));
             System.out.println("[DEBUG] Applied Nimbus-specific UIManager properties");
         } else {
             System.out.println("[DEBUG] NimbusLookAndFeel not active, skipping Nimbus-specific properties");
@@ -158,9 +166,20 @@ public class ThemeManager {
         } else if (component instanceof JLabel) {
             component.setForeground(colors.get("Label.foreground"));
         } else if (component instanceof JComboBox) {
-            component.setBackground(colors.get("ComboBox.background"));
-            component.setForeground(colors.get("ComboBox.foreground"));
-            ((JComboBox<?>) component).setOpaque(true);
+            JComboBox<?> comboBox = (JComboBox<?>) component;
+            comboBox.setBackground(colors.get("ComboBox.background"));
+            comboBox.setForeground(colors.get("ComboBox.foreground"));
+            comboBox.setOpaque(true);
+            // Set custom renderer to ensure readable text
+            comboBox.setRenderer(new DefaultListCellRenderer() {
+                @Override
+                public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                    Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                    c.setBackground(isSelected ? colors.get("ComboBox.selectionBackground") : colors.get("ComboBox.background"));
+                    c.setForeground(isSelected ? colors.get("ComboBox.selectionForeground") : colors.get("ComboBox.foreground"));
+                    return c;
+                }
+            });
         }
         SwingUtilities.updateComponentTreeUI(component);
         component.repaint();
