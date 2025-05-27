@@ -22,6 +22,7 @@ public class ThemeManager {
         LIGHT_COLORS.put("Label.foreground", Color.BLACK);
         LIGHT_COLORS.put("TextField.background", Color.WHITE);
         LIGHT_COLORS.put("TextField.foreground", Color.BLACK);
+        LIGHT_COLORS.put("TextField.caret", Color.BLACK); // Added for caret color
         LIGHT_COLORS.put("Table.background", new Color(255, 255, 255));
         LIGHT_COLORS.put("Table.foreground", new Color(0, 0, 0));
         LIGHT_COLORS.put("Table.gridColor", new Color(180, 180, 180));
@@ -42,8 +43,9 @@ public class ThemeManager {
         DARK_COLORS.put("Button.background", new Color(70, 70, 70));
         DARK_COLORS.put("Button.foreground", Color.WHITE);
         DARK_COLORS.put("Label.foreground", Color.WHITE);
-        DARK_COLORS.put("TextField.background", new Color(60, 60, 60));
+        DARK_COLORS.put("TextField.background", new Color(80, 80, 80)); // Lighter gray for better contrast
         DARK_COLORS.put("TextField.foreground", Color.WHITE);
+        DARK_COLORS.put("TextField.caret", Color.WHITE); // Added for caret visibility
         DARK_COLORS.put("Table.background", new Color(50, 50, 50));
         DARK_COLORS.put("Table.foreground", new Color(230, 230, 230));
         DARK_COLORS.put("Table.gridColor", new Color(100, 100, 100));
@@ -76,6 +78,7 @@ public class ThemeManager {
         UIManager.put("Button.foreground", colors.get("Button.foreground"));
         UIManager.put("TextField.background", colors.get("TextField.background"));
         UIManager.put("TextField.foreground", colors.get("TextField.foreground"));
+        UIManager.put("TextField.caretForeground", colors.get("TextField.caret")); // Added for caret
         UIManager.put("ComboBox.background", colors.get("ComboBox.background"));
         UIManager.put("ComboBox.foreground", colors.get("ComboBox.foreground"));
         UIManager.put("ComboBox.selectionBackground", colors.get("ComboBox.selectionBackground"));
@@ -92,6 +95,7 @@ public class ThemeManager {
             UIManager.put("text", colors.get("Button.foreground"));
             UIManager.put("ComboBox:\"ComboBox.renderer\"[Selected].background", colors.get("ComboBox.selectionBackground"));
             UIManager.put("ComboBox:\"ComboBox.renderer\"[Selected].textForeground", colors.get("ComboBox.selectionForeground"));
+            UIManager.put("TextField.caretForeground", colors.get("TextField.caret")); // Added for Nimbus
             System.out.println("[DEBUG] Applied Nimbus-specific UIManager properties");
         } else {
             System.out.println("[DEBUG] NimbusLookAndFeel not active, skipping Nimbus-specific properties");
@@ -161,8 +165,10 @@ public class ThemeManager {
             component.setBackground(colors.get("Button.background"));
             component.setForeground(colors.get("Button.foreground"));
         } else if (component instanceof JTextField) {
-            component.setBackground(colors.get("TextField.background"));
-            component.setForeground(colors.get("TextField.foreground"));
+            JTextField textField = (JTextField) component;
+            textField.setBackground(colors.get("TextField.background"));
+            textField.setForeground(colors.get("TextField.foreground"));
+            textField.setCaretColor(colors.get("TextField.caret")); // Added for caret visibility
         } else if (component instanceof JLabel) {
             component.setForeground(colors.get("Label.foreground"));
         } else if (component instanceof JComboBox) {

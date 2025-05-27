@@ -108,13 +108,49 @@ public class ProductDAO {
         return products;
     }
 
-        public List<Product> getLowStockProducts(int threshold) throws SQLException {
+    public List<Product> getLowStockProducts(int threshold) throws SQLException {
         List<Product> lowStockProducts = new ArrayList<>();
         String sql = "SELECT p.id, p.name, c.name AS category_name, p.stock, p.price, p.description " +
                      "FROM products p LEFT JOIN categories c ON p.category_id = c.id " +
                      "WHERE p.stock < ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, threshold);
+            try (ResultSet rs = stmt.executeQuery()) {
+                int sequenceNumber = 1;
+                while (rs.next()) {
+                    Product product = new Product(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("category_name"),
+                        rs.getInt("stock"),
+                        rs.getDouble("price"),
+                        rs.getString("description")
+                    );
+                    product.setDisplayId(sequenceNumber++);
+                    lowStockProducts.add(product);
+                }
+            }
+        }
+        return lowStockProducts;
+    }
+
+    public List<Product> searchProducts(String query) throws SQLException {
+        List<Product> products = new ArrayList<>();
+        String sql = "SELECT p.id, p.name, c.name AS category_name, p.stock, p.price, p.description " +
+                     "FROM products p LEFT JOIN categories c ON p.category_id = c.id " +
+                     "WHERE p.name LIKE ? OR p.description LIKE ? OR c.name LIKE ? OR p.id = ? " +
+                     "ORDER BY p.id";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            String searchTerm = "%" + query + "%";
+            stmt.setString(1, searchTerm);
+            stmt.setString(2, searchTerm);
+            stmt.setString(3, searchTerm);
+            try {
+                int id = Integer.parseInt(query);
+                stmt.setInt(4, id);
+            } catch (NumberFormatException e) {
+                stmt.setInt(4, -1); // Invalid ID, no match
+            }
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     Product product = new Product(
@@ -125,60 +161,8 @@ public class ProductDAO {
                         rs.getDouble("price"),
                         rs.getString("description")
                     );
-                    lowStockProducts.add(product);
-                }
-            }
-        }
-        return lowStockProducts;
-    }
-
-    public List<Product> searchProducts(String query) throws SQLException {
-        List<Product> products = new ArrayList<>();
-        try {
-            int searchId = Integer.parseInt(query);
-
-            String idSql = "SELECT p.id, p.name, c.name AS category_name, p.stock, p.price, p.description " +
-                          "FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?";
-            try (PreparedStatement idStmt = conn.prepareStatement(idSql)) {
-                idStmt.setInt(1, searchId);
-                ResultSet rs = idStmt.executeQuery();
-                if (rs.next()) {
-                    Product product = new Product(
-                        rs.getInt("id"),
-                        rs.getString("name"),
-                        rs.getString("category_name"),
-                        rs.getInt("stock"),
-                        rs.getDouble("price"),
-                        rs.getString("description")
-                    );
-                    product.setDisplayId(1); // Single result, set to 1
                     products.add(product);
-                    return products;
                 }
-            }
-        } catch (NumberFormatException e) {}
-
-        String textSql = "SELECT p.id, p.name, c.name AS category_name, p.stock, p.price, p.description " +
-                        "FROM products p LEFT JOIN categories c ON p.category_id = c.id " +
-                        "WHERE p.name LIKE ? OR p.description LIKE ? ORDER BY p.id";
-        try (PreparedStatement textStmt = conn.prepareStatement(textSql)) {
-            String searchTerm = "%" + query + "%";
-            textStmt.setString(1, searchTerm);
-            textStmt.setString(2, searchTerm);
-
-            ResultSet rs = textStmt.executeQuery();
-            int sequenceNumber = 1;
-            while (rs.next()) {
-                Product product = new Product(
-                    rs.getInt("id"),
-                    rs.getString("name"),
-                    rs.getString("category_name"),
-                    rs.getInt("stock"),
-                    rs.getDouble("price"),
-                    rs.getString("description")
-                );
-                product.setDisplayId(sequenceNumber++);
-                products.add(product);
             }
         }
         return products;
@@ -211,12 +195,9 @@ public class ProductDAO {
 
             int affectedRows = stmt.executeUpdate();
             if (affectedRows > 0) {
-                // Remove resetAutoIncrement call to avoid unnecessary DB changes
                 return true;
             }
             return false;
         }
     }
-
-    // Remove resetAutoIncrement method as it's no longer needed
 }

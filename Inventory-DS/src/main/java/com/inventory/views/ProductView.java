@@ -30,7 +30,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         setLayout(new BorderLayout());
         setupKeyBindings();
         initializeUI();
-        // Apply theme to table immediately after initialization
         applyThemeToTable();
         refreshTable();
         ThemeManager.addThemeChangeListener(this);
@@ -41,6 +40,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
 
         searchPanel.add(new JLabel("Search:"));
         searchField = new JTextField(20);
+        searchField.setToolTipText("Search by Display ID, Name, Category, or Description (Ctrl+S)");
         searchField.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) {
                 searchProducts();
@@ -96,7 +96,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         buttonPanel.add(lowStockButton);
 
         refreshButton.setToolTipText("View all products (Ctrl+R)");
-        searchField.setToolTipText("Searches ID first, then name/description (Ctrl+S)");
+        searchField.setToolTipText("Search by Display ID, Name, Category, or Description (Ctrl+S)");
         addButton.setToolTipText("Add new product (Ctrl+A)");
         editButton.setToolTipText("Edit selected product (Ctrl+E)");
         deleteButton.setToolTipText("Delete selected product (Ctrl+D)");
@@ -192,9 +192,9 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     product.getId()
                 });
             }
-            // Re-apply theme to table after refreshing data
             applyThemeToTable();
             checkLowStockOnRefresh();
+            System.out.println("[DEBUG] Refreshed table with " + products.size() + " products");
         } catch (SQLException e) {
             ErrorHandler.handleError(this, "Error loading products", e);
         }
@@ -218,7 +218,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 StringBuilder message = new StringBuilder("Low stock alert:\n");
                 for (Product product : lowStockProducts) {
                     message.append(String.format("ID: %d, Name: %s, Stock: %d\n",
-                        product.getId(), product.getName(), product.getStock()));
+                        product.getDisplayId(), product.getName(), product.getStock()));
                 }
                 JOptionPane optionPane = new JOptionPane(message.toString(), JOptionPane.WARNING_MESSAGE);
                 ThemeManager.applyThemeToOptionPane(optionPane);
@@ -242,7 +242,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 StringBuilder message = new StringBuilder("Low stock products:\n");
                 for (Product product : lowStockProducts) {
                     message.append(String.format("ID: %d, Name: %s, Stock: %d\n",
-                        product.getId(), product.getName(), product.getStock()));
+                        product.getDisplayId(), product.getName(), product.getStock()));
                 }
                 JOptionPane optionPane = new JOptionPane(message.toString(), JOptionPane.WARNING_MESSAGE);
                 ThemeManager.applyThemeToOptionPane(optionPane);
@@ -256,15 +256,45 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
 
     private void searchProducts() {
         String query = searchField.getText().trim();
+        System.out.println("[DEBUG] ProductView.searchProducts: Query = '" + query + "'");
         try {
             tableModel.setRowCount(0);
-            List<Product> products = new ArrayList<>();
-            if (query.isEmpty()) {
-                products = productDAO.getAllProducts();
+            List<Product> products;
+
+            // Check if query is a numeric Display ID
+            if (query.matches("\\d+")) {
+                try {
+                    int displayId = Integer.parseInt(query);
+                    System.out.println("[DEBUG] ProductView.searchProducts: Searching for Display ID = " + displayId);
+                    products = productDAO.getAllProducts();
+                    List<Product> filteredProducts = new ArrayList<>();
+                    for (Product product : products) {
+                        if (product.getDisplayId() == displayId) {
+                            filteredProducts.add(product);
+                            System.out.println("[DEBUG] ProductView.searchProducts: Found match for Display ID " + displayId + " with DB_ID " + product.getId());
+                            break; // Only want the exact match
+                        }
+                    }
+                    products = filteredProducts; // Use filtered list, even if empty
+                    System.out.println("[DEBUG] ProductView.searchProducts: Filtered products count = " + products.size());
+                } catch (NumberFormatException e) {
+                    System.out.println("[DEBUG] ProductView.searchProducts: Invalid numeric query");
+                    products = productDAO.searchProducts(query);
+                }
             } else {
-                products = productDAO.searchProducts(query);
+                System.out.println("[DEBUG] ProductView.searchProducts: Searching for name, description, category, or DB ID");
+                products = query.isEmpty() ? productDAO.getAllProducts() : productDAO.searchProducts(query);
+                // Assign displayId for non-numeric search results
+                int sequenceNumber = 1;
+                for (Product product : products) {
+                    product.setDisplayId(sequenceNumber++);
+                }
             }
+
+            // Populate table
             for (Product product : products) {
+                System.out.println("[DEBUG] ProductView.searchProducts: Adding to table - DisplayID=" + product.getDisplayId() + ", DB_ID=" + product.getId() +
+                                   ", Name=" + product.getName());
                 tableModel.addRow(new Object[]{
                     product.getDisplayId(),
                     product.getName(),
@@ -275,7 +305,10 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     product.getId()
                 });
             }
+            productTable.revalidate();
+            productTable.repaint();
             applyThemeToTable();
+            System.out.println("[DEBUG] Searched products with query '" + query + "', found: " + products.size() + ", table rows: " + tableModel.getRowCount());
         } catch (SQLException e) {
             ErrorHandler.handleError(this, "Error searching products", e);
         }
