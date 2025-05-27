@@ -35,7 +35,7 @@ public class UserDAO {
             stmt.setString(1, username);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                     boolean exists = rs.getInt(1) > 0;
+                    boolean exists = rs.getInt(1) > 0;
                     System.out.println("[DEBUG] usernameExists('" + username + "') -> " + exists);
                     return exists;
                 }
@@ -54,28 +54,28 @@ public class UserDAO {
                 return false;
             }
 
-        String sql = "INSERT INTO users (username, password, role, permissions) VALUES (?, ?, ?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            stmt.setString(1, user.getUsername());
-            stmt.setString(2, password); 
-            stmt.setString(3, user.getRole());
-            stmt.setString(4, user.getPermissions());
-            int affectedRows = stmt.executeUpdate();
-            if (affectedRows > 0) {
-                try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        user.setId(generatedKeys.getInt(1));
+            String sql = "INSERT INTO users (username, password, role, permissions) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                stmt.setString(1, user.getUsername());
+                stmt.setString(2, password); 
+                stmt.setString(3, user.getRole());
+                stmt.setString(4, user.getPermissions());
+                int affectedRows = stmt.executeUpdate();
+                if (affectedRows > 0) {
+                    try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                        if (generatedKeys.next()) {
+                            user.setId(generatedKeys.getInt(1));
+                        }
                     }
-                }
-                conn.commit();
+                    conn.commit();
                     System.out.println("[DEBUG] Successfully added user: " + user.getUsername() + " with ID: " + user.getId());
                     return true;
-            }
-            conn.rollback();
+                }
+                conn.rollback();
                 System.out.println("[DEBUG] Failed to add user: " + user.getUsername() + " (no rows affected)");
                 return false;
-        }
-    } catch (SQLException e) {
+            }
+        } catch (SQLException e) {
             conn.rollback();
             System.err.println("[ERROR] Failed to add user: " + user.getUsername() + " - " + e.getMessage());
             throw e;
@@ -94,8 +94,8 @@ public class UserDAO {
         String sql = "DELETE FROM users WHERE id = ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, userId);
-            int rowsAffected = stmt.executeUpdate();
-            if (rowsAffected > 0) {
+            int affectedRows = stmt.executeUpdate();
+            if (affectedRows > 0) {
                 System.out.println("[DEBUG] Successfully deleted user with ID: " + userId);
                 return true;
             } else {
@@ -119,6 +119,27 @@ public class UserDAO {
                 users.add(user);
             }
         }
+        return users;
+    }
+
+    public List<User> searchUsers(String query) throws SQLException {
+        List<User> users = new ArrayList<>();
+        String trimmedQuery = query.trim();
+        System.out.println("[DEBUG] searchUsers: Raw query = '" + query + "', Trimmed query = '" + trimmedQuery + "'");
+        String sql = "SELECT id, username, role, permissions FROM users WHERE username LIKE ? OR role LIKE ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, "%" + trimmedQuery + "%");
+            stmt.setString(2, "%" + trimmedQuery + "%");
+            System.out.println("[DEBUG] searchUsers: Executing SQL = " + sql + " with params [username=%" + trimmedQuery + "%, role=%" + trimmedQuery + "%]");
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    User user = new User(rs.getInt("id"), rs.getString("username"), rs.getString("role"));
+                    user.setPermissions(rs.getString("permissions"));
+                    users.add(user);
+                }
+            }
+        }
+        System.out.println("[DEBUG] searchUsers('" + trimmedQuery + "') -> found " + users.size() + " users");
         return users;
     }
 }

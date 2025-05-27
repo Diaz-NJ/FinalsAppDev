@@ -9,15 +9,17 @@ import main.java.com.inventory.dao.DBConnection;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.ActionEvent;
+import java.awt.event.*;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class UserView extends JPanel implements ThemeManager.ThemeChangeListener {
     private JTable userTable;
     private DefaultTableModel tableModel;
     private JButton addButton, deleteButton, refreshButton;
+    private JTextField searchField;
 
     public interface RegisterCallback {
         void onRegister(String username, String password, String role);
@@ -25,7 +27,29 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
     
     public UserView() {
         setLayout(new BorderLayout());
+        initializeUI();
+        setupKeyBindings();
+        refreshTable();
+        ThemeManager.addThemeChangeListener(this);
+        applyThemeToComponents();
+    }
 
+    private void initializeUI() {
+        // Search panel
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.add(new JLabel("Search:"));
+        searchField = new JTextField(20);
+        searchField.setToolTipText("Search by Display ID, username, or role (Ctrl+S)");
+        searchField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                searchUsers();
+            }
+        });
+        searchPanel.add(searchField);
+        add(searchPanel, BorderLayout.NORTH);
+
+        // Table setup
         String[] columns = {"ID", "Username", "Role", "DB_ID"};
         tableModel = new DefaultTableModel(columns, 0) { 
             @Override
@@ -34,8 +58,11 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             }
         };
         userTable = new JTable(tableModel);
+        userTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         add(new JScrollPane(userTable), BorderLayout.CENTER);
+        userTable.removeColumn(userTable.getColumnModel().getColumn(3));
 
+        // Button panel
         JPanel buttonPanel = new JPanel();
         addButton = new JButton("Add User");
         deleteButton = new JButton("Delete");
@@ -56,9 +83,80 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
         buttonPanel.add(refreshButton);
         add(buttonPanel, BorderLayout.SOUTH);
 
-        refreshTable();
-        ThemeManager.addThemeChangeListener(this);
-        applyThemeToComponents();
+        // Apply theme to new components
+        ThemeManager.applyThemeToComponent(searchPanel);
+        ThemeManager.applyThemeToComponent(searchField);
+    }
+
+    private void setupKeyBindings() {
+        InputMap inputMap = getInputMap(WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = getActionMap();
+
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK), "search");
+        actionMap.put("search", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                searchField.requestFocusInWindow();
+            }
+        });
+    }
+
+    private void searchUsers() {
+        String query = searchField.getText().trim();
+        System.out.println("[DEBUG] UserView.searchUsers: Query = '" + query + "'");
+        try {
+            tableModel.setRowCount(0);
+            Connection conn = DBConnection.getConnection();
+            UserDAO userDAO = new UserDAO(conn);
+            List<User> users;
+
+            // Check if query is a numeric Display ID
+            if (query.matches("\\d+")) {
+                try {
+                    int displayId = Integer.parseInt(query);
+                    System.out.println("[DEBUG] UserView.searchUsers: Searching for Display ID = " + displayId);
+                    users = userDAO.getAllUsers();
+                    List<User> filteredUsers = new ArrayList<>();
+                    int currentDisplayId = 1;
+                    for (User user : users) {
+                        user.setDisplayId(currentDisplayId); // Assign displayId for matching
+                        System.out.println("[DEBUG] UserView.searchUsers: Checking user - displayId=" + currentDisplayId + ", DB_ID=" + user.getId());
+                        if (currentDisplayId == displayId) {
+                            filteredUsers.add(user);
+                            System.out.println("[DEBUG] UserView.searchUsers: Found match for Display ID " + displayId + " with DB_ID " + user.getId());
+                            break; // Only want the exact match
+                        }
+                        currentDisplayId++;
+                    }
+                    users = filteredUsers; // Use filtered list, even if empty
+                } catch (NumberFormatException e) {
+                    System.out.println("[DEBUG] UserView.searchUsers: Invalid numeric query");
+                    users = userDAO.searchUsers(query);
+                }
+            } else {
+                System.out.println("[DEBUG] UserView.searchUsers: Searching for username or role");
+                users = query.isEmpty() ? userDAO.getAllUsers() : userDAO.searchUsers(query);
+                // Assign displayId to all users for consistent display
+                for (int i = 0; i < users.size(); i++) {
+                    users.get(i).setDisplayId(i + 1);
+                }
+            }
+
+            // Populate table using the preserved displayId
+            for (User user : users) {
+                System.out.println("[DEBUG] UserView.searchUsers: Adding to table - displayId=" + user.getDisplayId() + ", DB_ID=" + user.getId());
+                tableModel.addRow(new Object[] {
+                    user.getDisplayId(),
+                    user.getUsername(),
+                    user.getRole(),
+                    user.getId()
+                });
+            }
+            System.out.println("[DEBUG] Searched users with query '" + query + "', found: " + users.size());
+        } catch (SQLException e) {
+            System.err.println("[ERROR] Error searching users: " + e.getMessage());
+            ErrorHandler.handleError(this, "Error searching users", e);
+        }
     }
 
     private void refreshTable() {
@@ -76,6 +174,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             for (int i = 0; i < users.size(); i++) {
                 User user = users.get(i);
                 user.setDisplayId(i + 1);
+                System.out.println("[DEBUG] refreshTable: Adding user - displayId=" + user.getDisplayId() + ", DB_ID=" + user.getId());
                 tableModel.addRow(new Object[] {
                     user.getDisplayId(),
                     user.getUsername(), 
@@ -86,6 +185,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             userTable.removeColumn(userTable.getColumnModel().getColumn(3));
             System.out.println("[DEBUG] Refreshed table with " + users.size() + " users");
         } catch (SQLException e) {
+            System.err.println("[ERROR] Error refreshing table: " + e.getMessage());
             ErrorHandler.handleError(this, "Error loading users", e);
         }
     }
@@ -220,6 +320,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
         ThemeManager.applyThemeToComponent(addButton);
         ThemeManager.applyThemeToComponent(deleteButton);
         ThemeManager.applyThemeToComponent(refreshButton);
+        ThemeManager.applyThemeToComponent(searchField);
         for (Component comp : getComponents()) {
             if (comp instanceof JPanel) {
                 JPanel panel = (JPanel) comp;
