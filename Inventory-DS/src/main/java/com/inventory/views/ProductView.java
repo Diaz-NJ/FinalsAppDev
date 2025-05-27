@@ -13,6 +13,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class ProductView extends JPanel implements ThemeManager.ThemeChangeListener {
     private JTable productTable;
@@ -29,6 +30,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         setLayout(new BorderLayout());
         setupKeyBindings();
         initializeUI();
+        // Apply theme to table immediately after initialization
+        applyThemeToTable();
         refreshTable();
         ThemeManager.addThemeChangeListener(this);
     }
@@ -117,7 +120,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
         });
 
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "add");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.CTRL_DOWN_MASK), "add");
         actionMap.put("add", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -189,10 +192,23 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     product.getId()
                 });
             }
+            // Re-apply theme to table after refreshing data
+            applyThemeToTable();
             checkLowStockOnRefresh();
         } catch (SQLException e) {
             ErrorHandler.handleError(this, "Error loading products", e);
         }
+    }
+
+    private void applyThemeToTable() {
+        Map<String, Color> colors = (ThemeManager.getCurrentTheme() == ThemeManager.ThemeMode.LIGHT) ? 
+            ThemeManager.LIGHT_COLORS : ThemeManager.DARK_COLORS;
+        productTable.setBackground(colors.get("Table.background"));
+        productTable.setForeground(colors.get("Table.foreground"));
+        productTable.setGridColor(colors.get("Table.gridColor"));
+        productTable.repaint();
+        System.out.println("[DEBUG] ProductView table updated - Background: " + productTable.getBackground() + 
+                           ", Foreground: " + productTable.getForeground());
     }
 
     private void checkLowStockOnRefresh() {
@@ -259,6 +275,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     product.getId()
                 });
             }
+            applyThemeToTable();
         } catch (SQLException e) {
             ErrorHandler.handleError(this, "Error searching products", e);
         }
@@ -472,10 +489,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
         System.out.println("[DEBUG] ProductView: Theme changed to " + newTheme);
         SwingUtilities.updateComponentTreeUI(this);
-        productTable.setBackground(newTheme == ThemeManager.ThemeMode.LIGHT ? 
-            ThemeManager.LIGHT_COLORS.get("Table.background") : ThemeManager.DARK_COLORS.get("Table.background"));
-        productTable.setForeground(newTheme == ThemeManager.ThemeMode.LIGHT ? 
-            ThemeManager.LIGHT_COLORS.get("Table.foreground") : ThemeManager.DARK_COLORS.get("Table.foreground"));
+        applyThemeToTable();
         applyThemeToComponents();
         repaint();
         revalidate();

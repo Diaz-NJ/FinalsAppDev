@@ -23,10 +23,10 @@ public class ThemeManager {
         LIGHT_COLORS.put("TextField.background", Color.WHITE);
         LIGHT_COLORS.put("TextField.foreground", Color.BLACK);
         LIGHT_COLORS.put("Table.background", new Color(255, 255, 255));
-        LIGHT_COLORS.put("Table.foreground", Color.BLACK);
-        LIGHT_COLORS.put("Table.gridColor", new Color(200, 200, 200));
+        LIGHT_COLORS.put("Table.foreground", new Color(0, 0, 0)); // Pure black for better contrast
+        LIGHT_COLORS.put("Table.gridColor", new Color(180, 180, 180)); // Slightly darker grid for visibility
         LIGHT_COLORS.put("TabbedPane.background", new Color(220, 220, 220));
-        LIGHT_COLORS.put("TabbedPane.foreground", Color.BLACK);
+        LIGHT_COLORS.put("TabbedPane.foreground", new Color(0, 0, 0)); // Pure black for better contrast
         LIGHT_COLORS.put("ToolBar.background", new Color(230, 230, 230));
         LIGHT_COLORS.put("ScrollPane.background", new Color(240, 240, 240));
         LIGHT_COLORS.put("Dialog.background", new Color(240, 240, 240));
@@ -43,10 +43,10 @@ public class ThemeManager {
         DARK_COLORS.put("TextField.background", new Color(60, 60, 60));
         DARK_COLORS.put("TextField.foreground", Color.WHITE);
         DARK_COLORS.put("Table.background", new Color(50, 50, 50));
-        DARK_COLORS.put("Table.foreground", Color.WHITE);
-        DARK_COLORS.put("Table.gridColor", new Color(90, 90, 90));
+        DARK_COLORS.put("Table.foreground", new Color(230, 230, 230)); // Brighter off-white for better readability
+        DARK_COLORS.put("Table.gridColor", new Color(100, 100, 100)); // Lighter grid for visibility
         DARK_COLORS.put("TabbedPane.background", new Color(30, 30, 30));
-        DARK_COLORS.put("TabbedPane.foreground", Color.WHITE);
+        DARK_COLORS.put("TabbedPane.foreground", new Color(200, 200, 200)); // Slightly dimmer white for tabs to reduce glare
         DARK_COLORS.put("ToolBar.background", new Color(50, 50, 50));
         DARK_COLORS.put("ScrollPane.background", new Color(40, 40, 40));
         DARK_COLORS.put("Dialog.background", new Color(40, 40, 40));

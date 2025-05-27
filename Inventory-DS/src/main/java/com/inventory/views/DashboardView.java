@@ -25,7 +25,6 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
         this.currentUser = user;
         try {
             this.conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/inventory_ds", "username", "password");
-            ThemeManager.setTheme(ThemeManager.ThemeMode.DARK);
             initializeUI();
             setupWindowListener();
             ThemeManager.addThemeChangeListener(this);
@@ -65,6 +64,12 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
         }
         
         add(tabbedPane, BorderLayout.CENTER);
+
+        // Apply theme to tabbed pane immediately after creation
+        ThemeManager.applyThemeToComponent(tabbedPane);
+        for (Component tab : tabbedPane.getComponents()) {
+            ThemeManager.applyThemeToComponent(tab);
+        }
     }
 
     private void setupWindowListener() {
@@ -101,6 +106,9 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
             if (userToLogout != null) {
                 SessionManager.clearSession(userToLogout);
             }
+
+            // Reset theme to default (LIGHT) before opening LoginView
+            ThemeManager.setTheme(ThemeManager.ThemeMode.LIGHT);
 
             EventQueue.invokeLater(() -> {
                 try {
