@@ -58,7 +58,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
 
         refreshTable();
         ThemeManager.addThemeChangeListener(this);
-        applyThemeToComponents(); // Apply initial theme
+        applyThemeToComponents();
     }
 
     private void refreshTable() {
@@ -96,7 +96,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             int userIdToDelete = (int) tableModel.getValueAt(selectedRow, 3);
             String username = (String) tableModel.getValueAt(selectedRow, 1);
             
-            ThemeManager.setTheme(ThemeManager.getCurrentTheme()); // Reapply theme to ensure dialog styling
+            ThemeManager.setTheme(ThemeManager.getCurrentTheme());
             int confirm = JOptionPane.showConfirmDialog(
                 this,
                 "Permanently delete user '" + username + "'?",
@@ -112,7 +112,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
                     
                     if (success) {
                         refreshTable();
-                        ThemeManager.setTheme(ThemeManager.getCurrentTheme()); // Reapply theme
+                        ThemeManager.setTheme(ThemeManager.getCurrentTheme());
                         JOptionPane.showMessageDialog(this, "User deleted successfully",
                             "Success", JOptionPane.INFORMATION_MESSAGE);
                     } else {
@@ -133,7 +133,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
     private void showRegisterDialog(ActionEvent e) {
         RegisterDialog dialog = new RegisterDialog((JFrame)SwingUtilities.getWindowAncestor(this));
         dialog.setRegisterCallback((username, password, role) -> {
-            ThemeManager.setTheme(ThemeManager.getCurrentTheme()); // Reapply theme
+            ThemeManager.setTheme(ThemeManager.getCurrentTheme());
             int confirm = JOptionPane.showConfirmDialog(
                 dialog,
                 "Create new user '" + username + "' with role '" + role + "'?",
@@ -148,7 +148,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
                     boolean addSuccess = userDAO.addUser(username, password, role);
                     if (addSuccess) {
                         refreshTable();
-                        ThemeManager.setTheme(ThemeManager.getCurrentTheme()); // Reapply theme
+                        ThemeManager.setTheme(ThemeManager.getCurrentTheme());
                         JOptionPane.showMessageDialog(this, "User registered successfully!",
                             "Success", JOptionPane.INFORMATION_MESSAGE);
                     } else {
@@ -279,24 +279,18 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
 
                 if (username.isEmpty() || password.isEmpty()) {
                     ErrorHandler.handleError(this, "Username and password cannot be empty");
-                    if (callback != null) {
-                        callback.onRegister(username, password, role);
-                    }
                     return;
                 }
 
                 if (password.length() < 8) {
                     ErrorHandler.handleError(this, "Password must be at least 8 characters long");
-                    if (callback != null) {
-                        callback.onRegister(username, password, role);
-                    }
                     return;
                 }
 
                 if (callback != null) {
                     callback.onRegister(username, password, role);
+                    dispose();
                 }
-                dispose();
             });
 
             ThemeManager.addThemeChangeListener(this);
