@@ -20,9 +20,14 @@ public class AuditLogView extends JPanel implements ThemeManager.ThemeChangeList
     private JButton refreshButton;
     private AuditLogDAO auditLogDAO;
     private User currentUser;
+    private Connection conn;
 
     public AuditLogView(User user, Connection conn) throws SQLException {
         this.currentUser = user;
+        this.conn = conn;
+        if (!currentUser.getRole().equals("Owner") && !currentUser.getRole().equals("Manager") && !currentUser.getRole().equals("Admin")) {
+        throw new SecurityException("Permission denied: Only Owner, Manager, or Admin can view audit logs");
+    }
         if (conn == null || conn.isClosed()) {
             System.err.println("[DEBUG] AuditLogView: Connection is null or closed");
             return; // Prevent further execution if connection is invalid

@@ -49,7 +49,8 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
         panel.add(passwordField);
 
         panel.add(new JLabel("Role:"));
-        roleComboBox = new JComboBox<>(new String[]{"User", "Admin"});
+        // Updated roles to match the system's role templates: Owner, Manager, Admin, Staff
+        roleComboBox = new JComboBox<>(new String[]{"Owner", "Manager", "Admin", "Staff"});
         panel.add(roleComboBox);
 
         JButton loginButton = new JButton("Login");

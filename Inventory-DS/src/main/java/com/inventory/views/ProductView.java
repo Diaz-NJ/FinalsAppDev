@@ -159,11 +159,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         actionMap.put("add", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin") || hasPermission("add")) {
-                    showProductDialog(null);
-                } else {
-                    ErrorHandler.handleError(ProductView.this, "Permission denied: Add not allowed");
-                }
+                if (hasPermission("add")) showProductDialog(null);
+                else ErrorHandler.handleError(ProductView.this, "Permission denied: Add not allowed");
             }
         });
 
@@ -171,11 +168,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         actionMap.put("edit", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin") || hasPermission("edit")) {
-                    editSelectedProduct();
-                } else {
-                    ErrorHandler.handleError(ProductView.this, "Permission denied: Edit not allowed");
-                }
+                if (hasPermission("edit")) editSelectedProduct();
+                else ErrorHandler.handleError(ProductView.this, "Permission denied: Edit not allowed");
             }
         });
 
@@ -183,11 +177,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         actionMap.put("delete", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin") || hasPermission("delete")) {
-                    deleteSelectedProduct();
-                } else {
-                    ErrorHandler.handleError(ProductView.this, "Permission denied: Delete not allowed");
-                }
+                if (hasPermission("delete")) deleteSelectedProduct();
+                else ErrorHandler.handleError(ProductView.this, "Permission denied: Delete not allowed");
             }
         });
 
@@ -203,11 +194,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         actionMap.put("lowStock", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin") || hasPermission("lowStock")) {
-                    checkLowStock();
-                } else {
-                    ErrorHandler.handleError(ProductView.this, "Permission denied: Low Stock check not allowed");
-                }
+                if (hasPermission("lowStock")) checkLowStock();
+                else ErrorHandler.handleError(ProductView.this, "Permission denied: Low Stock check not allowed");
             }
         });
 
@@ -215,11 +203,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         actionMap.put("import", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin") || hasPermission("add")) {
-                    importCSV();
-                } else {
-                    ErrorHandler.handleError(ProductView.this, "Permission denied: Import not allowed");
-                }
+                if (hasPermission("add")) importCSV();
+                else ErrorHandler.handleError(ProductView.this, "Permission denied: Import not allowed");
             }
         });
 
@@ -227,11 +212,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         actionMap.put("export", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin") || hasPermission("view")) {
-                    exportCSV();
-                } else {
-                    ErrorHandler.handleError(ProductView.this, "Permission denied: Export not allowed");
-                }
+                if (hasPermission("view")) exportCSV();
+                else ErrorHandler.handleError(ProductView.this, "Permission denied: Export not allowed");
             }
         });
 
@@ -239,11 +221,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         actionMap.put("backup", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin") || hasPermission("view")) {
-                    backupDatabase();
-                } else {
-                    ErrorHandler.handleError(ProductView.this, "Permission denied: Backup not allowed");
-                }
+                if (hasPermission("view")) backupDatabase();
+                else ErrorHandler.handleError(ProductView.this, "Permission denied: Backup not allowed");
             }
         });
 
@@ -251,11 +230,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         actionMap.put("restore", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentUser.getRole().equals("admin") || hasPermission("view")) {
-                    restoreDatabase();
-                } else {
-                    ErrorHandler.handleError(ProductView.this, "Permission denied: Restore not allowed");
-                }
+                if (hasPermission("view")) restoreDatabase();
+                else ErrorHandler.handleError(ProductView.this, "Permission denied: Restore not allowed");
             }
         });
     }
@@ -580,18 +556,66 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     }
 
     private void updateButtonStates() {
-        addButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("add"));
-        editButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("edit"));
-        deleteButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("delete"));
-        lowStockButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("lowStock"));
-        importButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("add"));
-        exportButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("view"));
-        backupButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("view"));
-        restoreButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("view"));
+        boolean isOwner = currentUser.getRole().equals("Owner");
+        boolean isManager = currentUser.getRole().equals("Manager");
+        boolean isAdmin = currentUser.getRole().equals("Admin");
+        boolean isStaff = currentUser.getRole().equals("Staff");
+
+        // Owner has full access
+        if (isOwner) {
+            addButton.setEnabled(true);
+            editButton.setEnabled(true);
+            deleteButton.setEnabled(true);
+            lowStockButton.setEnabled(true);
+            importButton.setEnabled(true);
+            exportButton.setEnabled(true);
+            backupButton.setEnabled(true);
+            restoreButton.setEnabled(true);
+            return;
+        }
+
+        // Manager has access to all product features and audit log
+        if (isManager) {
+            addButton.setEnabled(hasPermission("add"));
+            editButton.setEnabled(hasPermission("edit"));
+            deleteButton.setEnabled(hasPermission("delete"));
+            lowStockButton.setEnabled(hasPermission("lowStock"));
+            importButton.setEnabled(hasPermission("add"));
+            exportButton.setEnabled(hasPermission("view"));
+            backupButton.setEnabled(hasPermission("view"));
+            restoreButton.setEnabled(hasPermission("view"));
+            return;
+        }
+
+        // Admin has no product access, only user dashboard and audit log
+        if (isAdmin) {
+            addButton.setEnabled(false);
+            editButton.setEnabled(false);
+            deleteButton.setEnabled(false);
+            lowStockButton.setEnabled(false);
+            importButton.setEnabled(false);
+            exportButton.setEnabled(false);
+            backupButton.setEnabled(false);
+            restoreButton.setEnabled(false);
+            return;
+        }
+
+        // Staff has view-only access to product features
+        if (isStaff) {
+            addButton.setEnabled(false);
+            editButton.setEnabled(false);
+            deleteButton.setEnabled(false);
+            lowStockButton.setEnabled(hasPermission("lowStock"));
+            importButton.setEnabled(false);
+            exportButton.setEnabled(false);
+            backupButton.setEnabled(false);
+            restoreButton.setEnabled(false);
+            return;
+        }
     }
 
     private boolean hasPermission(String permission) {
-        if (currentUser.getRole().equals("admin")) return true;
+        if (currentUser.getRole().equals("Owner") || currentUser.getRole().equals("Manager")) return true;
         String perms = currentUser.getPermissions();
         if (perms == null || perms.isEmpty()) return false;
         String[] permArray = perms.split(",");
@@ -751,128 +775,128 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     }
 
     private void backupDatabase() {
-    JFileChooser fileChooser = new JFileChooser();
-    fileChooser.setDialogTitle("Save Backup File");
-    fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
-        @Override
-        public boolean accept(java.io.File f) {
-            return f.isDirectory() || f.getName().toLowerCase().endsWith(".sql");
-        }
-
-        @Override
-        public String getDescription() {
-            return "SQL Files (*.sql)";
-        }
-    });
-
-    applyThemeToFileChooser(fileChooser);
-
-    if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-        try {
-            String filePath = fileChooser.getSelectedFile().getAbsolutePath();
-            if (!filePath.toLowerCase().endsWith(".sql")) {
-                filePath += ".sql";
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save Backup File");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(java.io.File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".sql");
             }
 
-            String dbUsername = "root";
-            String dbPassword = "";
-            String dbName = "inventory_ds";
-            String host = "localhost";
+            @Override
+            public String getDescription() {
+                return "SQL Files (*.sql)";
+            }
+        });
 
-            ProcessBuilder pb = new ProcessBuilder(
-                "mysqldump", "-u" + dbUsername, "-p" + dbPassword, "-h" + host, dbName, "-r", filePath
-            );
-            Process process = pb.start();
-            int exitCode = process.waitFor();
+        applyThemeToFileChooser(fileChooser);
 
-            if (exitCode == 0) {
-                JOptionPane optionPane = new JOptionPane("Database backed up successfully to " + filePath, JOptionPane.INFORMATION_MESSAGE);
+        if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            try {
+                String filePath = fileChooser.getSelectedFile().getAbsolutePath();
+                if (!filePath.toLowerCase().endsWith(".sql")) {
+                    filePath += ".sql";
+                }
+
+                String dbUsername = "root";
+                String dbPassword = "";
+                String dbName = "inventory_ds";
+                String host = "localhost";
+
+                ProcessBuilder pb = new ProcessBuilder(
+                    "mysqldump", "-u" + dbUsername, "-p" + dbPassword, "-h" + host, dbName, "-r", filePath
+                );
+                Process process = pb.start();
+                int exitCode = process.waitFor();
+
+                if (exitCode == 0) {
+                    JOptionPane optionPane = new JOptionPane("Database backed up successfully to " + filePath, JOptionPane.INFORMATION_MESSAGE);
+                    ThemeManager.applyThemeToOptionPane(optionPane);
+                    JDialog dialog = optionPane.createDialog(this, "Backup Success");
+                    dialog.setVisible(true);
+                    AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
+                    try {
+                        auditLogDAO.logAction(currentUser.getId(), "Database Backup", "Backed up to " + filePath);
+                    } catch (SQLException e) {
+                        System.err.println("[ERROR] ProductView: Error logging backup action - " + e.getMessage());
+                        ErrorHandler.handleError(this, "Error logging backup action: " + e.getMessage(), e);
+                    }
+                } else {
+                    throw new IOException("Backup failed with exit code: " + exitCode);
+                }
+            } catch (IOException | InterruptedException e) {
+                System.err.println("[ERROR] ProductView: Error during backup - " + e.getMessage());
+                ErrorHandler.handleError(this, "Error creating backup: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    private void restoreDatabase() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select Backup File to Restore");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(java.io.File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".sql");
+            }
+
+            @Override
+            public String getDescription() {
+                return "SQL Files (*.sql)";
+            }
+        });
+
+        applyThemeToFileChooser(fileChooser);
+
+        if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            try {
+                String filePath = fileChooser.getSelectedFile().getAbsolutePath();
+
+                JOptionPane optionPane = new JOptionPane(
+                    "Are you sure you want to restore the database? This will overwrite existing data!",
+                    JOptionPane.WARNING_MESSAGE,
+                    JOptionPane.YES_NO_OPTION
+                );
                 ThemeManager.applyThemeToOptionPane(optionPane);
-                JDialog dialog = optionPane.createDialog(this, "Backup Success");
+                JDialog dialog = optionPane.createDialog(this, "Confirm Restore");
                 dialog.setVisible(true);
-                AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
-                try {
-                    auditLogDAO.logAction(currentUser.getId(), "Database Backup", "Backed up to " + filePath);
-                } catch (SQLException e) {
-                    System.err.println("[ERROR] ProductView: Error logging backup action - " + e.getMessage());
-                    ErrorHandler.handleError(this, "Error logging backup action: " + e.getMessage(), e);
+                Object selectedValue = optionPane.getValue();
+                if (selectedValue == null || !selectedValue.equals(JOptionPane.YES_OPTION)) {
+                    return;
                 }
-            } else {
-                throw new IOException("Backup failed with exit code: " + exitCode);
+
+                String dbUsername = "root";
+                String dbPassword = "";
+                String dbName = "inventory_ds";
+                String host = "localhost";
+
+                ProcessBuilder pb = new ProcessBuilder(
+                    "mysql", "-u" + dbUsername, "-p" + dbPassword, "-h" + host, dbName, "<", filePath
+                );
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+                int exitCode = process.waitFor();
+
+                if (exitCode == 0) {
+                    JOptionPane optionPaneSuccess = new JOptionPane("Database restored successfully from " + filePath, JOptionPane.INFORMATION_MESSAGE);
+                    ThemeManager.applyThemeToOptionPane(optionPaneSuccess);
+                    JDialog dialogSuccess = optionPaneSuccess.createDialog(this, "Restore Success");
+                    dialogSuccess.setVisible(true);
+                    refreshTable();
+                    AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
+                    try {
+                        auditLogDAO.logAction(currentUser.getId(), "Database Restore", "Restored from " + filePath);
+                    } catch (SQLException e) {
+                        System.err.println("[ERROR] ProductView: Error logging restore action - " + e.getMessage());
+                        ErrorHandler.handleError(this, "Error logging restore action: " + e.getMessage(), e);
+                    }
+                } else {
+                    throw new IOException("Restore failed with exit code: " + exitCode);
+                }
+            } catch (IOException | InterruptedException e) {
+                System.err.println("[ERROR] ProductView: Error during restore - " + e.getMessage());
+                ErrorHandler.handleError(this, "Error restoring database: " + e.getMessage(), e);
             }
-        } catch (IOException | InterruptedException e) {
-            System.err.println("[ERROR] ProductView: Error during backup - " + e.getMessage());
-            ErrorHandler.handleError(this, "Error creating backup: " + e.getMessage(), e);
         }
     }
-}
-
-private void restoreDatabase() {
-    JFileChooser fileChooser = new JFileChooser();
-    fileChooser.setDialogTitle("Select Backup File to Restore");
-    fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
-        @Override
-        public boolean accept(java.io.File f) {
-            return f.isDirectory() || f.getName().toLowerCase().endsWith(".sql");
-        }
-
-        @Override
-        public String getDescription() {
-            return "SQL Files (*.sql)";
-        }
-    });
-
-    applyThemeToFileChooser(fileChooser);
-
-    if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-        try {
-            String filePath = fileChooser.getSelectedFile().getAbsolutePath();
-
-            JOptionPane optionPane = new JOptionPane(
-                "Are you sure you want to restore the database? This will overwrite existing data!",
-                JOptionPane.WARNING_MESSAGE,
-                JOptionPane.YES_NO_OPTION
-            );
-            ThemeManager.applyThemeToOptionPane(optionPane);
-            JDialog dialog = optionPane.createDialog(this, "Confirm Restore");
-            dialog.setVisible(true);
-            Object selectedValue = optionPane.getValue();
-            if (selectedValue == null || !selectedValue.equals(JOptionPane.YES_OPTION)) {
-                return;
-            }
-
-            String dbUsername = "root";
-            String dbPassword = "";
-            String dbName = "inventory_ds";
-            String host = "localhost";
-
-            ProcessBuilder pb = new ProcessBuilder(
-                "mysql", "-u" + dbUsername, "-p" + dbPassword, "-h" + host, dbName, "<", filePath
-            );
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-            int exitCode = process.waitFor();
-
-            if (exitCode == 0) {
-                JOptionPane optionPaneSuccess = new JOptionPane("Database restored successfully from " + filePath, JOptionPane.INFORMATION_MESSAGE);
-                ThemeManager.applyThemeToOptionPane(optionPaneSuccess);
-                JDialog dialogSuccess = optionPaneSuccess.createDialog(this, "Restore Success");
-                dialogSuccess.setVisible(true);
-                refreshTable();
-                AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
-                try {
-                    auditLogDAO.logAction(currentUser.getId(), "Database Restore", "Restored from " + filePath);
-                } catch (SQLException e) {
-                    System.err.println("[ERROR] ProductView: Error logging restore action - " + e.getMessage());
-                    ErrorHandler.handleError(this, "Error logging restore action: " + e.getMessage(), e);
-                }
-            } else {
-                throw new IOException("Restore failed with exit code: " + exitCode);
-            }
-        } catch (IOException | InterruptedException e) {
-            System.err.println("[ERROR] ProductView: Error during restore - " + e.getMessage());
-            ErrorHandler.handleError(this, "Error restoring database: " + e.getMessage(), e);
-        }
-    }
-}
 }

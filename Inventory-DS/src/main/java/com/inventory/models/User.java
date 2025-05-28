@@ -12,7 +12,23 @@ public class User {
         this.username = username;
         this.role = role;
         this.displayId = 0;
-        this.permissions = "add:0,edit:0,delete:0,addUser:0,deleteUser:0,lowStock:0";
+        // Default permissions based on role
+        this.permissions = getDefaultPermissions(role);
+    }
+
+    public String getDefaultPermissions(String role) {
+        switch (role.toLowerCase()) {
+            case "owner":
+                return "add:1,edit:1,delete:1,addUser:1,deleteUser:1,lowStock:1,view:1";
+            case "manager":
+                return "add:1,edit:1,delete:1,lowStock:1,view:1"; // Product and audit log access
+            case "admin":
+                return "addUser:1,deleteUser:1,viewUsers:1,viewAudit:1,addOwner:0"; // User dashboard (no add Owner)
+            case "staff":
+                return "view:1,lowStock:1"; // Product dashboard/features only
+            default:
+                return "add:0,edit:0,delete:0,addUser:0,deleteUser:0,lowStock:0,view:0";
+        }
     }
 
     public int getId() { return id; }

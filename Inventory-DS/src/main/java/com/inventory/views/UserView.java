@@ -25,7 +25,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
         void onRegister(String username, String password, String role);
     }
     
-    public UserView(Connection conn) { // Updated constructor
+    public UserView(Connection conn) {
         this.conn = conn;
         setLayout(new BorderLayout());
         initializeUI();
@@ -90,6 +90,8 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
         ThemeManager.applyThemeToComponent(deleteButton);
         ThemeManager.applyThemeToComponent(refreshButton);
         ThemeManager.applyThemeToComponent(auditLogButton);
+
+        updateButtonStates();
     }
 
     private void setupKeyBindings() {
@@ -268,15 +270,18 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
     }
 
     private void showAuditLogView() {
-        if (!SessionManager.getCurrentUser().getRole().equals("admin")) {
-            ErrorHandler.handleError(this, "Permission denied: Only admins can view audit logs");
+        User currentUser = SessionManager.getCurrentUser();
+        String role = currentUser.getRole() != null ? currentUser.getRole().toLowerCase() : "";
+        System.out.println("[DEBUG] UserView.showAuditLogView: Current role: " + currentUser.getRole() + ", normalized role: " + role);
+        if (!role.equals("owner") && !role.equals("manager") && !role.equals("admin")) {
+            ErrorHandler.handleError(this, "Permission denied: Only Owner, Manager, or Admin can view audit logs");
             return;
         }
         try {
             JDialog dialog = new JDialog((JFrame)SwingUtilities.getWindowAncestor(this), "Audit Logs", true);
             dialog.setSize(800, 600);
             dialog.setLocationRelativeTo(this);
-            dialog.add(new AuditLogView(SessionManager.getCurrentUser(), conn));
+            dialog.add(new AuditLogView(currentUser, conn));
             dialog.setVisible(true);
         } catch (SQLException e) {
             System.err.println("[ERROR] UserView: Error opening audit log view - " + e.getMessage());
@@ -285,27 +290,22 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
     }
 
     private void updateButtonStates() {
-        Component[] components = getComponents();
-        for (Component c : components) {
-            if (c instanceof JPanel) {
-                for (Component btn : ((JPanel)c).getComponents()) {
-                    if (btn instanceof JButton) {
-                        JButton button = (JButton) btn;
-                        switch (button.getText()) {
-                            case "Add User":
-                                button.setEnabled(hasPermission("addUser"));
-                                break;
-                            case "Delete":
-                                button.setEnabled(hasPermission("deleteUser"));
-                                break;
-                            case "View Audit Logs":
-                                button.setEnabled(SessionManager.getCurrentUser().getRole().equals("admin"));
-                                break;
-                        }
-                    }
-                }
-            }
-        }
+        User currentUser = SessionManager.getCurrentUser();
+        String role = currentUser.getRole() != null ? currentUser.getRole().toLowerCase() : "";
+        boolean isOwner = role.equals("owner");
+        boolean isManager = role.equals("manager");
+        boolean isAdmin = role.equals("admin");
+        boolean isStaff = role.equals("staff");
+
+        System.out.println("[DEBUG] UserView.updateButtonStates: Current role: " + currentUser.getRole() + ", normalized role: " + role + ", isOwner: " + isOwner);
+
+        addButton.setEnabled(isOwner || isAdmin || (isManager && hasPermission("addUser")));
+        deleteButton.setEnabled(isOwner || isAdmin || (isManager && hasPermission("deleteUser")));
+        auditLogButton.setEnabled(isOwner || isManager || isAdmin);
+
+        System.out.println("[DEBUG] UserView.updateButtonStates: addButton enabled: " + addButton.isEnabled() + 
+                           ", deleteButton enabled: " + deleteButton.isEnabled() + 
+                           ", auditLogButton enabled: " + auditLogButton.isEnabled());
     }
 
     private boolean hasPermission(String permission) {
@@ -313,11 +313,8 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             System.out.println("[DEBUG] hasPermission: currentUser or role is null");
             return false;
         }
-        if (SessionManager.getCurrentUser().getRole().equals("admin")) {
-            System.out.println("[DEBUG] hasPermission: Admin role detected, granting access for " + permission);
-            return true;
-        }
         String perms = SessionManager.getCurrentUser().getPermissions();
+        System.out.println("[DEBUG] hasPermission: Permissions string for user " + SessionManager.getCurrentUser().getUsername() + ": " + perms);
         if (perms == null || perms.isEmpty()) {
             System.out.println("[DEBUG] hasPermission: Permissions string is null or empty");
             return false;
@@ -383,7 +380,8 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
 
             usernameField = new JTextField(15);
             passwordField = new JPasswordField(15);
-            roleComboBox = new JComboBox<>(new String[]{"user", "admin"});
+            String[] roles = getAvailableRoles();
+            roleComboBox = new JComboBox<>(roles);
             registerButton = new JButton("Register");
 
             add(new JLabel("Username:"));
@@ -420,6 +418,17 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             applyThemeToComponents();
             pack();
             setLocationRelativeTo(parent);
+        }
+
+        private String[] getAvailableRoles() {
+            User currentUser = SessionManager.getCurrentUser();
+            if (currentUser.getRole().equals("Owner")) {
+                return new String[]{"Staff", "Admin", "Manager", "Owner"};
+            } else if (currentUser.getRole().equals("Admin")) {
+                return new String[]{"Staff", "Admin", "Manager"}; // No ability to add Owner
+            } else {
+                return new String[]{"Staff"}; // Only Staff for Manager or Staff
+            }
         }
 
         public void setRegisterCallback(RegisterCallback callback) {

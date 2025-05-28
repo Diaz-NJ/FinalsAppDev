@@ -37,7 +37,7 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
     }
 
     private void initializeUI() throws SQLException {
-        setTitle("Dashboard - Welcome, " + currentUser.getUsername());
+        setTitle("Dashboard - Welcome, " + currentUser.getUsername()+ " (" + currentUser.getRole() + ")");
         setSize(1000, 700);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -57,13 +57,33 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
         add(toolBar, BorderLayout.NORTH);
 
         tabbedPane = new JTabbedPane();
-        tabbedPane.addTab("Products", new ProductView(currentUser, conn));
         
-        if (currentUser.getRole().equals("admin")) {
-            tabbedPane.addTab("Users", new UserView(conn)); // Pass connection
+        // Use case-insensitive comparison for roles
+        String role = currentUser.getRole() != null ? currentUser.getRole().toLowerCase() : "";
+
+        // Product tab: Visible to Owner, Manager, and Staff (not Admin)
+        if (role.equals("owner") || role.equals("manager") || role.equals("staff")) {
+            tabbedPane.addTab("Products", new ProductView(currentUser, conn));
+        }
+
+        // User tab: Visible to Owner, Manager, and Admin
+        if (role.equals("owner") || role.equals("manager") || role.equals("admin")) {
+            tabbedPane.addTab("Users", new UserView(conn));
+        }
+
+        // Audit Log tab: Visible to Owner, Manager, and Admin
+        if (role.equals("owner") || role.equals("manager") || role.equals("admin")) {
             tabbedPane.addTab("Audit Logs", new AuditLogView(currentUser, conn));
         }
         
+        // Ensure at least one tab is added; if no tabs are visible, show an error
+        if (tabbedPane.getTabCount() == 0) {
+            JOptionPane.showMessageDialog(this, "No accessible features for role: " + currentUser.getRole(), 
+                "Access Denied", JOptionPane.ERROR_MESSAGE);
+            performLogout(null);
+            return;
+        }
+
         add(tabbedPane, BorderLayout.CENTER);
 
         ThemeManager.applyThemeToComponent(tabbedPane);

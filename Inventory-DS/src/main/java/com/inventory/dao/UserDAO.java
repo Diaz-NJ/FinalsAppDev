@@ -15,21 +15,25 @@ public class UserDAO {
     }
 
     public User validateUser(String username, String password, String role) throws SQLException {
-        String sql = "SELECT * FROM users WHERE username = ? AND password = ? AND role = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, username);
-            stmt.setString(2, password);
-            stmt.setString(3, role);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    User user = new User(rs.getInt("id"), rs.getString("username"), rs.getString("role"));
-                    user.setPermissions(rs.getString("permissions"));
-                    return user;
-                }
+    String sql = "SELECT * FROM users WHERE username = ? AND password = ? AND LOWER(role) = LOWER(?)";
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+        stmt.setString(1, username);
+        stmt.setString(2, password);
+        stmt.setString(3, role);
+        try (ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                String dbRole = rs.getString("role");
+                String normalizedRole = dbRole != null ? 
+                dbRole.substring(0, 1).toUpperCase() + dbRole.substring(1).toLowerCase() : null;
+                String dbPermissions = rs.getString("permissions");
+                User user = new User(rs.getInt("id"), rs.getString("username"), normalizedRole);
+                user.setPermissions(dbPermissions != null ? dbPermissions : user.getDefaultPermissions(normalizedRole));
+                return user;
             }
         }
-        return null;
     }
+    return null;
+}
 
     public boolean usernameExists(String username) throws SQLException {
         String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
@@ -91,8 +95,7 @@ public class UserDAO {
     }
 
     public boolean addUser(String username, String password, String role) throws SQLException {
-        User user = new User(0, username, role);
-        user.setPermissions("add:1,edit:1,delete:1,addUser:0,deleteUser:0,lowStock:1");
+        User user = new User(0, username, role); // Permissions set by User constructor
         return addUser(user, password);
     }
 
