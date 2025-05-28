@@ -568,6 +568,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     }
 
     private boolean hasPermission(String permission) {
+        if (currentUser.getRole().equals("admin")) return true;
         String perms = currentUser.getPermissions();
         if (perms == null || perms.isEmpty()) return false;
         String[] permArray = perms.split(",");
