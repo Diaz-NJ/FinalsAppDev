@@ -556,16 +556,20 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     }
 
     private void updateButtonStates() {
-        boolean isOwner = currentUser.getRole().equals("Owner");
-        boolean isManager = currentUser.getRole().equals("Manager");
-        boolean isAdmin = currentUser.getRole().equals("Admin");
-        boolean isStaff = currentUser.getRole().equals("Staff");
+        String role = currentUser.getRole() != null ? currentUser.getRole().toLowerCase() : "";
+        boolean isOwner = role.equals("owner");
+        boolean isManager = role.equals("manager");
+        boolean isAdmin = role.equals("admin");
+        boolean isStaff = role.equals("staff");
+
+        System.out.println("[DEBUG] ProductView.updateButtonStates: Current role: " + currentUser.getRole() + ", normalized role: " + role);
 
         // Owner has full access
         if (isOwner) {
             addButton.setEnabled(true);
             editButton.setEnabled(true);
             deleteButton.setEnabled(true);
+            refreshButton.setEnabled(true);
             lowStockButton.setEnabled(true);
             importButton.setEnabled(true);
             exportButton.setEnabled(true);
@@ -579,6 +583,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             addButton.setEnabled(hasPermission("add"));
             editButton.setEnabled(hasPermission("edit"));
             deleteButton.setEnabled(hasPermission("delete"));
+            refreshButton.setEnabled(hasPermission("view"));
             lowStockButton.setEnabled(hasPermission("lowStock"));
             importButton.setEnabled(hasPermission("add"));
             exportButton.setEnabled(hasPermission("view"));
@@ -587,24 +592,12 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             return;
         }
 
-        // Admin has no product access, only user dashboard and audit log
+        // Admin can view all and check low stock
         if (isAdmin) {
             addButton.setEnabled(false);
             editButton.setEnabled(false);
             deleteButton.setEnabled(false);
-            lowStockButton.setEnabled(false);
-            importButton.setEnabled(false);
-            exportButton.setEnabled(false);
-            backupButton.setEnabled(false);
-            restoreButton.setEnabled(false);
-            return;
-        }
-
-        // Staff has view-only access to product features
-        if (isStaff) {
-            addButton.setEnabled(false);
-            editButton.setEnabled(false);
-            deleteButton.setEnabled(false);
+            refreshButton.setEnabled(hasPermission("view"));
             lowStockButton.setEnabled(hasPermission("lowStock"));
             importButton.setEnabled(false);
             exportButton.setEnabled(false);
@@ -612,10 +605,35 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             restoreButton.setEnabled(false);
             return;
         }
+
+        // Staff has full product access
+        if (isStaff) {
+            addButton.setEnabled(hasPermission("add"));
+            editButton.setEnabled(hasPermission("edit"));
+            deleteButton.setEnabled(hasPermission("delete"));
+            refreshButton.setEnabled(hasPermission("view"));
+            lowStockButton.setEnabled(hasPermission("lowStock"));
+            importButton.setEnabled(hasPermission("add"));
+            exportButton.setEnabled(hasPermission("view"));
+            backupButton.setEnabled(false);
+            restoreButton.setEnabled(false);
+            return;
+        }
+
+        // Default: Disable all buttons for other roles
+        addButton.setEnabled(false);
+        editButton.setEnabled(false);
+        deleteButton.setEnabled(false);
+        refreshButton.setEnabled(false);
+        lowStockButton.setEnabled(false);
+        importButton.setEnabled(false);
+        exportButton.setEnabled(false);
+        backupButton.setEnabled(false);
+        restoreButton.setEnabled(false);
     }
 
     private boolean hasPermission(String permission) {
-        if (currentUser.getRole().equals("Owner") || currentUser.getRole().equals("Manager")) return true;
+        if (currentUser.getRole() != null && (currentUser.getRole().toLowerCase().equals("owner") || currentUser.getRole().toLowerCase().equals("manager"))) return true;
         String perms = currentUser.getPermissions();
         if (perms == null || perms.isEmpty()) return false;
         String[] permArray = perms.split(",");

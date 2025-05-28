@@ -23,9 +23,9 @@ public class User {
             case "manager":
                 return "add:1,edit:1,delete:1,lowStock:1,view:1"; // Product and audit log access
             case "admin":
-                return "addUser:1,deleteUser:1,viewUsers:1,viewAudit:1,addOwner:0"; // User dashboard (no add Owner)
+                return "addUser:1,deleteUser:1,viewUsers:1,viewAudit:1,addOwner:0,view:1,lowStock:1"; // Added view and lowStock
             case "staff":
-                return "view:1,lowStock:1"; // Product dashboard/features only
+                return "add:1,delete:1,edit:1,view:1,lowStock:1,import:1,export:1"; // Full Product dashboard access
             default:
                 return "add:0,edit:0,delete:0,addUser:0,deleteUser:0,lowStock:0,view:0";
         }

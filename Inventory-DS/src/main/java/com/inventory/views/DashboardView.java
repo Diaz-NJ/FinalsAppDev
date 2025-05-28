@@ -61,8 +61,8 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
         // Use case-insensitive comparison for roles
         String role = currentUser.getRole() != null ? currentUser.getRole().toLowerCase() : "";
 
-        // Product tab: Visible to Owner, Manager, and Staff (not Admin)
-        if (role.equals("owner") || role.equals("manager") || role.equals("staff")) {
+        // Product tab: Visible to Owner, Manager, Admin, and Staff
+        if (role.equals("owner") || role.equals("manager") || role.equals("admin") || role.equals("staff")) {
             tabbedPane.addTab("Products", new ProductView(currentUser, conn));
         }
 
