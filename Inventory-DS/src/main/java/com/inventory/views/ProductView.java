@@ -608,7 +608,51 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         System.out.println("[DEBUG] ProductView applied theme - Background: " + getBackground());
     }
 
-    // New method to handle CSV import
+    // Helper method to apply theme to JFileChooser components
+    private void applyThemeToFileChooser(JFileChooser fileChooser) {
+        if (ThemeManager.getCurrentTheme() == ThemeManager.ThemeMode.DARK) {
+            Map<String, Color> darkColors = ThemeManager.DARK_COLORS;
+            fileChooser.setBackground(darkColors.get("Panel.background"));
+            fileChooser.setForeground(darkColors.get("Panel.foreground"));
+            
+            // Recursively apply theme to all components
+            applyThemeToComponentsRecursive(fileChooser, darkColors);
+        }
+    }
+
+    private void applyThemeToComponentsRecursive(Component component, Map<String, Color> darkColors) {
+        if (component == null) return;
+
+        component.setBackground(darkColors.get("Panel.background"));
+        component.setForeground(darkColors.get("Panel.foreground"));
+
+        if (component instanceof JLabel) {
+            ((JLabel) component).setForeground(darkColors.get("Panel.foreground"));
+        } else if (component instanceof JTextField) {
+            ((JTextField) component).setBackground(darkColors.get("Panel.background"));
+            ((JTextField) component).setForeground(darkColors.get("Panel.foreground"));
+            ((JTextField) component).setCaretColor(darkColors.get("Panel.foreground"));
+        } else if (component instanceof JList) {
+            ((JList<?>) component).setBackground(darkColors.get("Panel.background"));
+            ((JList<?>) component).setForeground(darkColors.get("Panel.foreground"));
+            ((JList<?>) component).setSelectionBackground(darkColors.get("Table.selectionBackground"));
+            ((JList<?>) component).setSelectionForeground(darkColors.get("Table.selectionForeground"));
+        } else if (component instanceof JButton) {
+            ((JButton) component).setBackground(darkColors.get("Button.background"));
+            ((JButton) component).setForeground(darkColors.get("Button.foreground"));
+        } else if (component instanceof JComboBox) {
+            ((JComboBox<?>) component).setBackground(darkColors.get("Panel.background"));
+            ((JComboBox<?>) component).setForeground(darkColors.get("Panel.foreground"));
+        }
+
+        if (component instanceof Container) {
+            for (Component child : ((Container) component).getComponents()) {
+                applyThemeToComponentsRecursive(child, darkColors);
+            }
+        }
+    }
+
+    // Updated method to handle CSV import
     private void importCSV() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Select CSV File to Import");
@@ -623,6 +667,9 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 return "CSV Files (*.csv)";
             }
         });
+
+        // Apply dark theme to file chooser
+        applyThemeToFileChooser(fileChooser);
 
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             try {
@@ -646,7 +693,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         }
     }
 
-    // New method to handle CSV export
+    // Updated method to handle CSV export
     private void exportCSV() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Save CSV File");
@@ -661,6 +708,9 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 return "CSV Files (*.csv)";
             }
         });
+
+        // Apply dark theme to file chooser
+        applyThemeToFileChooser(fileChooser);
 
         if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             try {
