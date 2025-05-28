@@ -1,15 +1,21 @@
 package main.java.com.inventory.dao;
 
 import main.java.com.inventory.models.Product;
+import main.java.com.inventory.models.User;
+import main.java.com.inventory.services.SessionManager;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ProductDAO {
     private Connection conn;
+    private AuditLogDAO auditLogDAO;
+    private int userId;
 
-    public ProductDAO(Connection conn) {
+    public ProductDAO(Connection conn, int userId) {
         this.conn = conn;
+        this.userId = userId;
+        this.auditLogDAO = new AuditLogDAO(conn);
     }
 
     public boolean addProduct(Product product) throws SQLException {
@@ -21,14 +27,25 @@ public class ProductDAO {
         }
 
         String sql = "INSERT INTO products (name, category_id, stock, price, description) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+        try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, product.getName());
             stmt.setInt(2, categoryId);
             stmt.setInt(3, product.getStock());
             stmt.setDouble(4, product.getPrice());
             stmt.setString(5, product.getDescription());
             
-            return stmt.executeUpdate() > 0;
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        product.setId(rs.getInt(1));
+                    }
+                }
+                auditLogDAO.logAction(userId, "Product Added", 
+                    String.format("Product ID: %d, Name: %s", product.getId(), product.getName()));
+                return true;
+            }
+            return false;
         }
     }
 
@@ -184,17 +201,35 @@ public class ProductDAO {
             stmt.setDouble(4, product.getPrice());
             stmt.setString(5, product.getDescription());
             stmt.setInt(6, product.getId());
-            return stmt.executeUpdate() > 0;
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                auditLogDAO.logAction(userId, "Product Edited", 
+                    String.format("Product ID: %d, Name: %s", product.getId(), product.getName()));
+                return true;
+            }
+            return false;
         }
     }
 
     public boolean deleteProduct(int productId) throws SQLException {
-        String sql = "DELETE FROM products WHERE id = ?";
+        String sql = "SELECT name FROM products WHERE id = ?";
+        String productName = null;
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, productId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    productName = rs.getString("name");
+                }
+            }
+        }
 
+        sql = "DELETE FROM products WHERE id = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, productId);
             int affectedRows = stmt.executeUpdate();
             if (affectedRows > 0) {
+                auditLogDAO.logAction(userId, "Product Deleted", 
+                    String.format("Product ID: %d, Name: %s", productId, productName != null ? productName : "Unknown"));
                 return true;
             }
             return false;

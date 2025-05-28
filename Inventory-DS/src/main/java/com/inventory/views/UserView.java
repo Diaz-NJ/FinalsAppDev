@@ -18,14 +18,16 @@ import java.util.List;
 public class UserView extends JPanel implements ThemeManager.ThemeChangeListener {
     private JTable userTable;
     private DefaultTableModel tableModel;
-    private JButton addButton, deleteButton, refreshButton;
+    private JButton addButton, deleteButton, refreshButton, auditLogButton;
     private JTextField searchField;
+    private Connection conn;
 
     public interface RegisterCallback {
         void onRegister(String username, String password, String role);
     }
     
-    public UserView() {
+    public UserView(Connection conn) { // Updated constructor
+        this.conn = conn;
         setLayout(new BorderLayout());
         initializeUI();
         setupKeyBindings();
@@ -35,7 +37,6 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
     }
 
     private void initializeUI() {
-        // Search panel
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         searchPanel.add(new JLabel("Search:"));
         searchField = new JTextField(20);
@@ -49,7 +50,6 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
         searchPanel.add(searchField);
         add(searchPanel, BorderLayout.NORTH);
 
-        // Table setup
         String[] columns = {"ID", "Username", "Role", "DB_ID"};
         tableModel = new DefaultTableModel(columns, 0) { 
             @Override
@@ -62,11 +62,11 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
         add(new JScrollPane(userTable), BorderLayout.CENTER);
         userTable.removeColumn(userTable.getColumnModel().getColumn(3));
 
-        // Button panel
         JPanel buttonPanel = new JPanel();
         addButton = new JButton("Add User");
         deleteButton = new JButton("Delete");
         refreshButton = new JButton("View All");
+        auditLogButton = new JButton("View Audit Logs");
 
         addButton.addActionListener(e -> {
             if (hasPermission("addUser")) showRegisterDialog(e);
@@ -77,15 +77,20 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             else ErrorHandler.handleError(this, "Permission denied: Delete User not allowed");
         });
         refreshButton.addActionListener(_ -> refreshTable());
+        auditLogButton.addActionListener(_ -> showAuditLogView());
 
         buttonPanel.add(addButton);
         buttonPanel.add(deleteButton);
         buttonPanel.add(refreshButton);
+        buttonPanel.add(auditLogButton);
         add(buttonPanel, BorderLayout.SOUTH);
 
-        // Apply theme to new components
         ThemeManager.applyThemeToComponent(searchPanel);
         ThemeManager.applyThemeToComponent(searchField);
+        ThemeManager.applyThemeToComponent(addButton);
+        ThemeManager.applyThemeToComponent(deleteButton);
+        ThemeManager.applyThemeToComponent(refreshButton);
+        ThemeManager.applyThemeToComponent(auditLogButton);
     }
 
     private void setupKeyBindings() {
@@ -106,11 +111,9 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
         System.out.println("[DEBUG] UserView.searchUsers: Query = '" + query + "'");
         try {
             tableModel.setRowCount(0);
-            Connection conn = DBConnection.getConnection();
             UserDAO userDAO = new UserDAO(conn);
             List<User> users;
 
-            // Check if query is a numeric Display ID
             if (query.matches("\\d+")) {
                 try {
                     int displayId = Integer.parseInt(query);
@@ -119,16 +122,16 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
                     List<User> filteredUsers = new ArrayList<>();
                     int currentDisplayId = 1;
                     for (User user : users) {
-                        user.setDisplayId(currentDisplayId); // Assign displayId for matching
+                        user.setDisplayId(currentDisplayId);
                         System.out.println("[DEBUG] UserView.searchUsers: Checking user - displayId=" + currentDisplayId + ", DB_ID=" + user.getId());
                         if (currentDisplayId == displayId) {
                             filteredUsers.add(user);
                             System.out.println("[DEBUG] UserView.searchUsers: Found match for Display ID " + displayId + " with DB_ID " + user.getId());
-                            break; // Only want the exact match
+                            break;
                         }
                         currentDisplayId++;
                     }
-                    users = filteredUsers; // Use filtered list, even if empty
+                    users = filteredUsers;
                 } catch (NumberFormatException e) {
                     System.out.println("[DEBUG] UserView.searchUsers: Invalid numeric query");
                     users = userDAO.searchUsers(query);
@@ -136,13 +139,11 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             } else {
                 System.out.println("[DEBUG] UserView.searchUsers: Searching for username or role");
                 users = query.isEmpty() ? userDAO.getAllUsers() : userDAO.searchUsers(query);
-                // Assign displayId to all users for consistent display
                 for (int i = 0; i < users.size(); i++) {
                     users.get(i).setDisplayId(i + 1);
                 }
             }
 
-            // Populate table using the preserved displayId
             for (User user : users) {
                 System.out.println("[DEBUG] UserView.searchUsers: Adding to table - displayId=" + user.getDisplayId() + ", DB_ID=" + user.getId());
                 tableModel.addRow(new Object[] {
@@ -154,7 +155,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             }
             System.out.println("[DEBUG] Searched users with query '" + query + "', found: " + users.size());
         } catch (SQLException e) {
-            System.err.println("[ERROR] Error searching users: " + e.getMessage());
+            System.err.println("[ERROR] UserView: Error searching users - " + e.getMessage());
             ErrorHandler.handleError(this, "Error searching users", e);
         }
     }
@@ -167,7 +168,6 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             String[] columns = {"ID", "Username", "Role", "DB_ID"}; 
             tableModel.setColumnIdentifiers(columns);
 
-            Connection conn = DBConnection.getConnection();
             UserDAO userDAO = new UserDAO(conn);
             List<User> users = userDAO.getAllUsers();
 
@@ -185,7 +185,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             userTable.removeColumn(userTable.getColumnModel().getColumn(3));
             System.out.println("[DEBUG] Refreshed table with " + users.size() + " users");
         } catch (SQLException e) {
-            System.err.println("[ERROR] Error refreshing table: " + e.getMessage());
+            System.err.println("[ERROR] UserView: Error refreshing table - " + e.getMessage());
             ErrorHandler.handleError(this, "Error loading users", e);
         }
     }
@@ -206,7 +206,6 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
-                    Connection conn = DBConnection.getConnection();
                     UserDAO userDAO = new UserDAO(conn);
                     boolean success = userDAO.deleteUser(userIdToDelete);
                     
@@ -222,6 +221,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
                     String message = ex.getMessage().contains("foreign key constraint") ?
                         "Cannot delete user: They are referenced by another record (e.g., in a related table)" :
                         "Database error while deleting user";
+                    System.err.println("[ERROR] UserView: " + message + " - " + ex.getMessage());
                     ErrorHandler.handleError(this, message, ex);
                 }
             }
@@ -243,8 +243,8 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
             
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
-                    Connection conn = DBConnection.getConnection();
                     UserDAO userDAO = new UserDAO(conn);
+                    System.out.println("[DEBUG] UserView: Attempting to add user - Username: " + username + ", Role: " + role);
                     boolean addSuccess = userDAO.addUser(username, password, role);
                     if (addSuccess) {
                         refreshTable();
@@ -252,18 +252,37 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
                         JOptionPane.showMessageDialog(this, "User registered successfully!",
                             "Success", JOptionPane.INFORMATION_MESSAGE);
                     } else {
+                        System.err.println("[ERROR] UserView: Failed to add user: " + username);
                         ErrorHandler.handleError(dialog, "Failed to add user: " + username);
                     }
                 } catch (SQLException ex) {
                     String message = ex.getMessage().contains("Duplicate entry") || 
                                      ex.getMessage().contains("already exists") ?
                                      "Username '" + username + "' is already taken" :
-                                     "Database error while registering user";
+                                     "Database error while registering user: " + ex.getMessage();
+                    System.err.println("[ERROR] UserView: " + message);
                     ErrorHandler.handleError(this, message, ex);
                 }
             }
         });
         dialog.setVisible(true);
+    }
+
+    private void showAuditLogView() {
+        if (!SessionManager.getCurrentUser().getRole().equals("admin")) {
+            ErrorHandler.handleError(this, "Permission denied: Only admins can view audit logs");
+            return;
+        }
+        try {
+            JDialog dialog = new JDialog((JFrame)SwingUtilities.getWindowAncestor(this), "Audit Logs", true);
+            dialog.setSize(800, 600);
+            dialog.setLocationRelativeTo(this);
+            dialog.add(new AuditLogView(SessionManager.getCurrentUser(), conn));
+            dialog.setVisible(true);
+        } catch (SQLException e) {
+            System.err.println("[ERROR] UserView: Error opening audit log view - " + e.getMessage());
+            ErrorHandler.handleError(this, "Error opening audit log view", e);
+        }
     }
 
     private void updateButtonStates() {
@@ -279,6 +298,9 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
                                 break;
                             case "Delete":
                                 button.setEnabled(hasPermission("deleteUser"));
+                                break;
+                            case "View Audit Logs":
+                                button.setEnabled(SessionManager.getCurrentUser().getRole().equals("admin"));
                                 break;
                         }
                     }
@@ -320,6 +342,7 @@ public class UserView extends JPanel implements ThemeManager.ThemeChangeListener
         ThemeManager.applyThemeToComponent(addButton);
         ThemeManager.applyThemeToComponent(deleteButton);
         ThemeManager.applyThemeToComponent(refreshButton);
+        ThemeManager.applyThemeToComponent(auditLogButton);
         ThemeManager.applyThemeToComponent(searchField);
         for (Component comp : getComponents()) {
             if (comp instanceof JPanel) {

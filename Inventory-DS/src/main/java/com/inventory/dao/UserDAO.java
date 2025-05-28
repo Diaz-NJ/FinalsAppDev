@@ -7,9 +7,11 @@ import java.util.List;
 
 public class UserDAO {
     private Connection conn;
+    private AuditLogDAO auditLogDAO;
 
     public UserDAO(Connection conn) {
         this.conn = conn;
+        this.auditLogDAO = new AuditLogDAO(conn);
     }
 
     public User validateUser(String username, String password, String role) throws SQLException {
@@ -47,7 +49,7 @@ public class UserDAO {
     public boolean addUser(User user, String password) throws SQLException {
         boolean autoCommit = conn.getAutoCommit();
         try {
-            conn.setAutoCommit(false); // Start transaction
+            conn.setAutoCommit(false);
             if (usernameExists(user.getUsername())) {
                 System.out.println("[DEBUG] addUser: Username '" + user.getUsername() + "' already exists, aborting insert");
                 conn.rollback();
@@ -57,7 +59,7 @@ public class UserDAO {
             String sql = "INSERT INTO users (username, password, role, permissions) VALUES (?, ?, ?, ?)";
             try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                 stmt.setString(1, user.getUsername());
-                stmt.setString(2, password); 
+                stmt.setString(2, password);
                 stmt.setString(3, user.getRole());
                 stmt.setString(4, user.getPermissions());
                 int affectedRows = stmt.executeUpdate();
@@ -67,13 +69,17 @@ public class UserDAO {
                             user.setId(generatedKeys.getInt(1));
                         }
                     }
+                    auditLogDAO.logAction(user.getId(), "User Added", 
+                        String.format("Username: %s, Role: %s", user.getUsername(), user.getRole()));
+                    System.out.println("[DEBUG] UserDAO: Logged 'User Added' action for user ID: " + user.getId());
                     conn.commit();
                     System.out.println("[DEBUG] Successfully added user: " + user.getUsername() + " with ID: " + user.getId());
                     return true;
+                } else {
+                    conn.rollback();
+                    System.out.println("[DEBUG] Failed to add user: " + user.getUsername() + " (no rows affected)");
+                    return false;
                 }
-                conn.rollback();
-                System.out.println("[DEBUG] Failed to add user: " + user.getUsername() + " (no rows affected)");
-                return false;
             }
         } catch (SQLException e) {
             conn.rollback();
@@ -91,20 +97,44 @@ public class UserDAO {
     }
 
     public boolean deleteUser(int userId) throws SQLException {
-        String sql = "DELETE FROM users WHERE id = ?";
+        String sql = "SELECT username FROM users WHERE id = ?";
+        String username = null;
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, userId);
-            int affectedRows = stmt.executeUpdate();
-            if (affectedRows > 0) {
-                System.out.println("[DEBUG] Successfully deleted user with ID: " + userId);
-                return true;
-            } else {
-                System.out.println("[DEBUG] No user found with ID: " + userId);
-                return false;
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    username = rs.getString("username");
+                }
+            }
+        }
+
+        boolean autoCommit = conn.getAutoCommit();
+        try {
+            conn.setAutoCommit(false);
+            String details = String.format("User ID: %d, Username: %s", userId, username != null ? username : "Unknown");
+            auditLogDAO.logAction(userId, "User Deleted", details); // Log before deletion
+            System.out.println("[DEBUG] UserDAO: Logged 'User Deleted' action for user ID: " + userId);
+
+            sql = "DELETE FROM users WHERE id = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, userId);
+                int affectedRows = stmt.executeUpdate();
+                if (affectedRows > 0) {
+                    conn.commit();
+                    System.out.println("[DEBUG] Successfully deleted user with ID: " + userId);
+                    return true;
+                } else {
+                    conn.rollback();
+                    System.out.println("[DEBUG] No user found with ID: " + userId);
+                    return false;
+                }
             }
         } catch (SQLException e) {
+            conn.rollback();
             System.err.println("[ERROR] Failed to delete user with ID: " + userId + " - " + e.getMessage());
             throw e;
+        } finally {
+            conn.setAutoCommit(autoCommit);
         }
     }
 

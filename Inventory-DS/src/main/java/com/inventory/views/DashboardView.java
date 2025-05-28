@@ -4,6 +4,8 @@ import main.java.com.inventory.models.User;
 import main.java.com.inventory.services.SessionManager;
 import main.java.com.inventory.utils.ThemeManager;
 import main.java.com.inventory.utils.ThemeTogglePanel;
+import main.java.com.inventory.views.AuditLogView;
+import main.java.com.inventory.dao.DBConnection;
 
 import javax.swing.*;
 import java.awt.*;
@@ -11,7 +13,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DashboardView extends JFrame implements ThemeManager.ThemeChangeListener {
@@ -24,7 +25,7 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
     public DashboardView(User user) {
         this.currentUser = user;
         try {
-            this.conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/inventory_ds", "username", "password");
+            this.conn = DBConnection.getConnection();
             initializeUI();
             setupWindowListener();
             ThemeManager.addThemeChangeListener(this);
@@ -36,7 +37,7 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
         }
     }
 
-    private void initializeUI() {
+    private void initializeUI() throws SQLException {
         setTitle("Dashboard - Welcome, " + currentUser.getUsername());
         setSize(1000, 700);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
@@ -60,12 +61,12 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
         tabbedPane.addTab("Products", new ProductView(currentUser, conn));
         
         if (currentUser.getRole().equals("admin")) {
-            tabbedPane.addTab("Users", new UserView()); 
+            tabbedPane.addTab("Users", new UserView(conn)); // Pass connection
+            tabbedPane.addTab("Audit Logs", new AuditLogView(currentUser, conn));
         }
         
         add(tabbedPane, BorderLayout.CENTER);
 
-        // Apply theme to tabbed pane immediately after creation
         ThemeManager.applyThemeToComponent(tabbedPane);
         for (Component tab : tabbedPane.getComponents()) {
             ThemeManager.applyThemeToComponent(tab);
@@ -107,7 +108,8 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
                 SessionManager.clearSession(userToLogout);
             }
 
-            // Reset theme to default (LIGHT) before opening LoginView
+            DBConnection.closeConnection();
+
             ThemeManager.setTheme(ThemeManager.ThemeMode.LIGHT);
 
             EventQueue.invokeLater(() -> {

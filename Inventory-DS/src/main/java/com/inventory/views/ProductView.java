@@ -5,6 +5,7 @@ import main.java.com.inventory.models.Product;
 import main.java.com.inventory.models.User;
 import main.java.com.inventory.utils.ErrorHandler;
 import main.java.com.inventory.utils.ThemeManager;
+import main.java.com.inventory.dao.AuditLogDAO;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -20,13 +21,15 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     private DefaultTableModel tableModel;
     private User currentUser;
     private ProductDAO productDAO;
+    private Connection conn;
     private JTextField searchField;
     private JButton addButton, editButton, deleteButton, refreshButton, lowStockButton;    
     private static final int LOW_STOCK_THRESHOLD = 20;
 
     public ProductView(User user, Connection conn) {
         this.currentUser = user;
-        this.productDAO = new ProductDAO(conn);
+        this.conn = conn;
+        this.productDAO = new ProductDAO(conn, currentUser.getId());
         setLayout(new BorderLayout());
         setupKeyBindings();
         initializeUI();
@@ -192,10 +195,17 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     product.getId()
                 });
             }
+            // Log the "Viewed all products" action
+            AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
+            auditLogDAO.logAction(currentUser.getId(), "Viewed all products", 
+                "Viewed by " + currentUser.getUsername());
+            System.out.println("[DEBUG] ProductView: Logged 'Viewed all products' action for user: " + currentUser.getUsername());
+
             applyThemeToTable();
             checkLowStockOnRefresh();
             System.out.println("[DEBUG] Refreshed table with " + products.size() + " products");
         } catch (SQLException e) {
+            System.err.println("[ERROR] ProductView: Error loading products - " + e.getMessage());
             ErrorHandler.handleError(this, "Error loading products", e);
         }
     }
@@ -226,6 +236,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 dialog.setVisible(true);
             }
         } catch (SQLException e) {
+            System.err.println("[ERROR] ProductView: Error checking low stock - " + e.getMessage());
             ErrorHandler.handleError(this, "Error checking low stock", e);
         }
     }
@@ -250,6 +261,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 dialog.setVisible(true);
             }
         } catch (SQLException e) {
+            System.err.println("[ERROR] ProductView: Error checking low stock - " + e.getMessage());
             ErrorHandler.handleError(this, "Error checking low stock", e);
         }
     }
@@ -310,6 +322,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             applyThemeToTable();
             System.out.println("[DEBUG] Searched products with query '" + query + "', found: " + products.size() + ", table rows: " + tableModel.getRowCount());
         } catch (SQLException e) {
+            System.err.println("[ERROR] ProductView: Error searching products - " + e.getMessage());
             ErrorHandler.handleError(this, "Error searching products", e);
         }
     }
@@ -413,10 +426,21 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 );
 
                 boolean success;
+                AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
                 if (product == null) {
                     success = productDAO.addProduct(editedProduct);
+                    if (success) {
+                        auditLogDAO.logAction(currentUser.getId(), "Product Added", 
+                            String.format("Product: %s, Category: %s", name, category));
+                        System.out.println("[DEBUG] ProductView: Logged 'Product Added' action for product: " + name);
+                    }
                 } else {
                     success = productDAO.updateProduct(editedProduct);
+                    if (success) {
+                        auditLogDAO.logAction(currentUser.getId(), "Product Edited", 
+                            String.format("Product ID: %d, Name: %s", editedProduct.getId(), name));
+                        System.out.println("[DEBUG] ProductView: Logged 'Product Edited' action for product: " + name);
+                    }
                 }
 
                 if (success) {
@@ -430,6 +454,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             } catch (IllegalArgumentException ex) {
                 ErrorHandler.handleError(this, ex.getMessage(), ex);
             } catch (SQLException ex) {
+                System.err.println("[ERROR] ProductDialog: Database error while saving product - " + ex.getMessage());
                 ErrorHandler.handleError(this, "Database error while saving product", ex);
             }
         }
@@ -460,6 +485,7 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     showProductDialog(product);
                 }
             } catch (SQLException e) {
+                System.err.println("[ERROR] ProductView: Error loading product - " + e.getMessage());
                 ErrorHandler.handleError(this, "Error loading product", e); 
             }
         } else {
@@ -470,6 +496,9 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     private void deleteSelectedProduct() {
         int selectedRow = productTable.getSelectedRow();
         if (selectedRow >= 0) {
+            int productId = (int) tableModel.getValueAt(selectedRow, 6);
+            String productName = (String) tableModel.getValueAt(selectedRow, 1);
+
             JOptionPane optionPane = new JOptionPane(
                 "Are you sure you want to delete this product?",
                 JOptionPane.QUESTION_MESSAGE,
@@ -483,14 +512,20 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 return;
             }
 
-            int productId = (int) tableModel.getValueAt(selectedRow, 6);
             try {
+                // Log the "Product Deleted" action
+                AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
+                auditLogDAO.logAction(currentUser.getId(), "Product Deleted", 
+                    String.format("Product ID: %d, Name: %s", productId, productName));
+                System.out.println("[DEBUG] ProductView: Logged 'Product Deleted' action for product: " + productName);
+
                 if (productDAO.deleteProduct(productId)) {
                     refreshTable();
                 } else {
                     ErrorHandler.handleError(this, "Failed to delete product", null);
                 }
             } catch (SQLException e) {
+                System.err.println("[ERROR] ProductView: Error deleting product - " + e.getMessage());
                 ErrorHandler.handleError(this, "Error deleting product", e);
             }
         } else {

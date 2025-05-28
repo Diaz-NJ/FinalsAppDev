@@ -6,6 +6,7 @@ import main.java.com.inventory.services.SessionManager;
 import main.java.com.inventory.utils.ThemeManager;
 import main.java.com.inventory.utils.ErrorHandler;
 import main.java.com.inventory.dao.DBConnection;
+import main.java.com.inventory.dao.AuditLogDAO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -16,10 +17,18 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JComboBox<String> roleComboBox;
+    private Connection conn;
 
     public LoginView() {
-        initializeUI();
-        ThemeManager.addThemeChangeListener(this);
+        try {
+            this.conn = DBConnection.getConnection(); // Use singleton connection
+            initializeUI();
+            ThemeManager.addThemeChangeListener(this);
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Database connection failed: " + e.getMessage(), 
+                "Error", JOptionPane.ERROR_MESSAGE);
+            System.exit(1);
+        }
     }
 
     private void initializeUI() {
@@ -69,11 +78,16 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
                 throw new IllegalArgumentException("Username and password cannot be empty");
             }
 
-            Connection conn = DBConnection.getConnection();
             UserDAO userDAO = new UserDAO(conn);
             User authenticatedUser = userDAO.validateUser(username, password, role);
 
             if (authenticatedUser != null) {
+                // Log the login action
+                AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
+                auditLogDAO.logAction(authenticatedUser.getId(), "User Logged In", 
+                    "Username: " + username + ", Role: " + role);
+                System.out.println("[DEBUG] LoginView: Logged 'User Logged In' action for user: " + username);
+
                 SessionManager.startSession(authenticatedUser);
                 this.dispose();
                 SwingUtilities.invokeLater(() -> {
@@ -84,10 +98,13 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
                 throw new SecurityException("Invalid credentials or role mismatch");
             }
         } catch (SQLException ex) {
+            System.err.println("[ERROR] LoginView: Database error during login - " + ex.getMessage());
             ErrorHandler.handleError(this, "Database error during login", ex);
         } catch (IllegalArgumentException | SecurityException ex) {
+            System.err.println("[ERROR] LoginView: " + ex.getMessage());
             ErrorHandler.handleError(this, ex.getMessage(), ex);
         } catch (Exception ex) {
+            System.err.println("[ERROR] LoginView: Unexpected error during login - " + ex.getMessage());
             ErrorHandler.handleError(this, "Unexpected error during login", ex);
         }
     }
