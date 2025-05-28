@@ -4,7 +4,6 @@ import main.java.com.inventory.models.User;
 import main.java.com.inventory.services.SessionManager;
 import main.java.com.inventory.utils.ThemeManager;
 import main.java.com.inventory.utils.ThemeTogglePanel;
-import main.java.com.inventory.views.AuditLogView;
 import main.java.com.inventory.dao.DBConnection;
 
 import javax.swing.*;
