@@ -1,11 +1,15 @@
 package main.java.com.inventory.dao;
 
 import main.java.com.inventory.models.Product;
-import main.java.com.inventory.models.User;
-import main.java.com.inventory.services.SessionManager;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
+import com.opencsv.exceptions.CsvValidationException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class ProductDAO {
     private Connection conn;
@@ -233,6 +237,90 @@ public class ProductDAO {
                 return true;
             }
             return false;
+        }
+    }
+
+    // New method to import products from a CSV file
+    public void importProductsFromCSV(String filePath) throws SQLException, IOException, CsvValidationException {
+        try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
+            // Read header row
+            String[] headers = reader.readNext();
+            if (headers == null || headers.length != 5 || 
+                !headers[0].equals("name") || !headers[1].equals("category_name") || 
+                !headers[2].equals("stock") || !headers[3].equals("price") || 
+                !headers[4].equals("description")) {
+                throw new IOException("Invalid CSV format. Expected headers: name,category_name,stock,price,description");
+            }
+
+            String[] row;
+            while ((row = reader.readNext()) != null) {
+                // Parse CSV row
+                String name = row[0].trim();
+                String categoryName = row[1].trim();
+                String stockStr = row[2].trim();
+                String priceStr = row[3].trim();
+                String description = row[4].trim();
+
+                // Validate required fields
+                if (name.isEmpty() || categoryName.isEmpty() || stockStr.isEmpty() || priceStr.isEmpty()) {
+                    System.out.println("[WARN] Skipping row due to missing required fields: " + String.join(",", row));
+                    continue;
+                }
+
+                // Parse numeric fields
+                int stock;
+                double price;
+                try {
+                    stock = Integer.parseInt(stockStr);
+                    price = Double.parseDouble(priceStr);
+                } catch (NumberFormatException e) {
+                    System.out.println("[WARN] Skipping row due to invalid stock or price format: " + String.join(",", row));
+                    continue;
+                }
+
+                // Validate numeric values
+                if (stock < 0 || price < 0) {
+                    System.out.println("[WARN] Skipping row due to negative stock or price: " + String.join(",", row));
+                    continue;
+                }
+
+                // Create product
+                Product product = new Product(0, name, categoryName, stock, price, description);
+
+                // Insert into database
+                try {
+                    addProduct(product);
+                } catch (SQLException e) {
+                    System.out.println("[ERROR] Failed to import product: " + name + " - " + e.getMessage());
+                    throw e; // Re-throw to handle in UI
+                }
+            }
+
+            auditLogDAO.logAction(userId, "Imported Products", "Imported products from CSV file: " + filePath);
+        }
+    }
+
+    // New method to export products to a CSV file
+    public void exportProductsToCSV(String filePath) throws SQLException, IOException {
+        try (CSVWriter writer = new CSVWriter(new FileWriter(filePath))) {
+            // Write header
+            writer.writeNext(new String[]{"name", "category_name", "stock", "price", "description"});
+
+            // Get all products
+            List<Product> products = getAllProducts();
+
+            // Write each product to CSV
+            for (Product product : products) {
+                writer.writeNext(new String[]{
+                    product.getName(),
+                    product.getCategoryName() != null ? product.getCategoryName() : "",
+                    String.valueOf(product.getStock()),
+                    String.valueOf(product.getPrice()),
+                    product.getDescription() != null ? product.getDescription() : ""
+                });
+            }
+
+            auditLogDAO.logAction(userId, "Exported Products", "Exported products to CSV file: " + filePath);
         }
     }
 }

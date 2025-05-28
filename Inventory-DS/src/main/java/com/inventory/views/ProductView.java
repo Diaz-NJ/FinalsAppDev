@@ -15,6 +15,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.io.IOException;
+import com.opencsv.exceptions.CsvValidationException;
 
 public class ProductView extends JPanel implements ThemeManager.ThemeChangeListener {
     private JTable productTable;
@@ -23,7 +25,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
     private ProductDAO productDAO;
     private Connection conn;
     private JTextField searchField;
-    private JButton addButton, editButton, deleteButton, refreshButton, lowStockButton;    
+    private JButton addButton, editButton, deleteButton, refreshButton, lowStockButton;
+    private JButton importButton, exportButton; // New buttons for import/export
     private static final int LOW_STOCK_THRESHOLD = 20;
 
     public ProductView(User user, Connection conn) {
@@ -73,6 +76,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         deleteButton = new JButton("Delete");
         refreshButton = new JButton("View All");
         lowStockButton = new JButton("Check Low Stock");
+        importButton = new JButton("Import CSV"); // New import button
+        exportButton = new JButton("Export CSV"); // New export button
 
         addButton.addActionListener(_ -> {
             if (hasPermission("add")) showProductDialog(null);
@@ -91,12 +96,22 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             if (hasPermission("lowStock")) checkLowStock();
             else ErrorHandler.handleError(this, "Permission denied: Low Stock check not allowed");
         });
+        importButton.addActionListener(_ -> {
+            if (hasPermission("add")) importCSV();
+            else ErrorHandler.handleError(this, "Permission denied: Import not allowed");
+        });
+        exportButton.addActionListener(_ -> {
+            if (hasPermission("view")) exportCSV();
+            else ErrorHandler.handleError(this, "Permission denied: Export not allowed");
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
         buttonPanel.add(deleteButton);
         buttonPanel.add(refreshButton);
         buttonPanel.add(lowStockButton);
+        buttonPanel.add(importButton);
+        buttonPanel.add(exportButton);
 
         refreshButton.setToolTipText("View all products (Ctrl+R)");
         searchField.setToolTipText("Search by Display ID, Name, Category, or Description (Ctrl+S)");
@@ -104,6 +119,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         editButton.setToolTipText("Edit selected product (Ctrl+E)");
         deleteButton.setToolTipText("Delete selected product (Ctrl+D)");
         lowStockButton.setToolTipText("Check products with low stock (Ctrl+L)");
+        importButton.setToolTipText("Import products from CSV file (Ctrl+I)");
+        exportButton.setToolTipText("Export products to CSV file (Ctrl+E)");
 
         updateButtonStates();
         add(buttonPanel, BorderLayout.SOUTH);
@@ -175,6 +192,31 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     checkLowStock();
                 } else {
                     ErrorHandler.handleError(ProductView.this, "Permission denied: Low Stock check not allowed");
+                }
+            }
+        });
+
+        // New key bindings for import/export
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.CTRL_DOWN_MASK), "import");
+        actionMap.put("import", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (currentUser.getRole().equals("admin") || hasPermission("add")) {
+                    importCSV();
+                } else {
+                    ErrorHandler.handleError(ProductView.this, "Permission denied: Import not allowed");
+                }
+            }
+        });
+
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK), "export");
+        actionMap.put("export", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (currentUser.getRole().equals("admin") || hasPermission("view")) {
+                    exportCSV();
+                } else {
+                    ErrorHandler.handleError(ProductView.this, "Permission denied: Export not allowed");
                 }
             }
         });
@@ -426,21 +468,10 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 );
 
                 boolean success;
-                AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
                 if (product == null) {
                     success = productDAO.addProduct(editedProduct);
-                    if (success) {
-                        auditLogDAO.logAction(currentUser.getId(), "Product Added", 
-                            String.format("Product: %s, Category: %s", name, category));
-                        System.out.println("[DEBUG] ProductView: Logged 'Product Added' action for product: " + name);
-                    }
                 } else {
                     success = productDAO.updateProduct(editedProduct);
-                    if (success) {
-                        auditLogDAO.logAction(currentUser.getId(), "Product Edited", 
-                            String.format("Product ID: %d, Name: %s", editedProduct.getId(), name));
-                        System.out.println("[DEBUG] ProductView: Logged 'Product Edited' action for product: " + name);
-                    }
                 }
 
                 if (success) {
@@ -513,12 +544,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
 
             try {
-                // Log the "Product Deleted" action
-                AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
-                auditLogDAO.logAction(currentUser.getId(), "Product Deleted", 
-                    String.format("Product ID: %d, Name: %s", productId, productName));
-                System.out.println("[DEBUG] ProductView: Logged 'Product Deleted' action for product: " + productName);
-
                 if (productDAO.deleteProduct(productId)) {
                     refreshTable();
                 } else {
@@ -538,6 +563,8 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         editButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("edit"));
         deleteButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("delete"));
         lowStockButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("lowStock"));
+        importButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("add"));
+        exportButton.setEnabled(currentUser.getRole().equals("admin") || hasPermission("view"));
     }
 
     private boolean hasPermission(String permission) {
@@ -578,5 +605,80 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
         }
         System.out.println("[DEBUG] ProductView applied theme - Background: " + getBackground());
+    }
+
+    // New method to handle CSV import
+    private void importCSV() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select CSV File to Import");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(java.io.File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".csv");
+            }
+
+            @Override
+            public String getDescription() {
+                return "CSV Files (*.csv)";
+            }
+        });
+
+        if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            try {
+                String filePath = fileChooser.getSelectedFile().getAbsolutePath();
+                productDAO.importProductsFromCSV(filePath);
+                refreshTable();
+                JOptionPane optionPane = new JOptionPane("Products imported successfully!", JOptionPane.INFORMATION_MESSAGE);
+                ThemeManager.applyThemeToOptionPane(optionPane);
+                JDialog dialog = optionPane.createDialog(this, "Import Success");
+                dialog.setVisible(true);
+            } catch (SQLException e) {
+                System.err.println("[ERROR] ProductView: Error importing CSV - " + e.getMessage());
+                ErrorHandler.handleError(this, "Error importing CSV: " + e.getMessage(), e);
+            } catch (IOException e) {
+                System.err.println("[ERROR] ProductView: Error reading CSV file - " + e.getMessage());
+                ErrorHandler.handleError(this, "Error reading CSV file: " + e.getMessage(), e);
+            } catch (CsvValidationException e) {
+                System.err.println("[ERROR] ProductView: Error validating CSV file - " + e.getMessage());
+                ErrorHandler.handleError(this, "Error validating CSV file: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    // New method to handle CSV export
+    private void exportCSV() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save CSV File");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(java.io.File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".csv");
+            }
+
+            @Override
+            public String getDescription() {
+                return "CSV Files (*.csv)";
+            }
+        });
+
+        if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            try {
+                String filePath = fileChooser.getSelectedFile().getAbsolutePath();
+                if (!filePath.toLowerCase().endsWith(".csv")) {
+                    filePath += ".csv";
+                }
+                productDAO.exportProductsToCSV(filePath);
+                JOptionPane optionPane = new JOptionPane("Products exported successfully to " + filePath, JOptionPane.INFORMATION_MESSAGE);
+                ThemeManager.applyThemeToOptionPane(optionPane);
+                JDialog dialog = optionPane.createDialog(this, "Export Success");
+                dialog.setVisible(true);
+            } catch (SQLException e) {
+                System.err.println("[ERROR] ProductView: Error exporting CSV - " + e.getMessage());
+                ErrorHandler.handleError(this, "Error exporting CSV: " + e.getMessage(), e);
+            } catch (IOException e) {
+                System.err.println("[ERROR] ProductView: Error writing CSV file - " + e.getMessage());
+                ErrorHandler.handleError(this, "Error writing CSV file: " + e.getMessage(), e);
+            }
+        }
     }
 }
