@@ -254,11 +254,9 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
             auditLogDAO.logAction(currentUser.getId(), "Viewed all products", 
                 "Viewed by " + currentUser.getUsername());
-            System.out.println("[DEBUG] ProductView: Logged 'Viewed all products' action for user: " + currentUser.getUsername());
 
             applyThemeToTable();
             checkLowStockOnRefresh();
-            System.out.println("[DEBUG] Refreshed table with " + products.size() + " products");
         } catch (SQLException e) {
             System.err.println("[ERROR] ProductView: Error loading products - " + e.getMessage());
             ErrorHandler.handleError(this, "Error loading products", e);
@@ -272,8 +270,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         productTable.setForeground(colors.get("Table.foreground"));
         productTable.setGridColor(colors.get("Table.gridColor"));
         productTable.repaint();
-        System.out.println("[DEBUG] ProductView table updated - Background: " + productTable.getBackground() + 
-                           ", Foreground: " + productTable.getForeground());
     }
 
     private void checkLowStockOnRefresh() {
@@ -323,7 +319,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
 
     private void searchProducts() {
         String query = searchField.getText().trim();
-        System.out.println("[DEBUG] ProductView.searchProducts: Query = '" + query + "'");
         try {
             tableModel.setRowCount(0);
             List<Product> products;
@@ -331,24 +326,19 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             if (query.matches("\\d+")) {
                 try {
                     int displayId = Integer.parseInt(query);
-                    System.out.println("[DEBUG] ProductView.searchProducts: Searching for Display ID = " + displayId);
                     products = productDAO.getAllProducts();
                     List<Product> filteredProducts = new ArrayList<>();
                     for (Product product : products) {
                         if (product.getDisplayId() == displayId) {
                             filteredProducts.add(product);
-                            System.out.println("[DEBUG] ProductView.searchProducts: Found match for Display ID " + displayId + " with DB_ID " + product.getId());
                             break;
                         }
                     }
                     products = filteredProducts;
-                    System.out.println("[DEBUG] ProductView.searchProducts: Filtered products count = " + products.size());
                 } catch (NumberFormatException e) {
-                    System.out.println("[DEBUG] ProductView.searchProducts: Invalid numeric query");
                     products = productDAO.searchProducts(query);
                 }
             } else {
-                System.out.println("[DEBUG] ProductView.searchProducts: Searching for name, description, category, or DB ID");
                 products = query.isEmpty() ? productDAO.getAllProducts() : productDAO.searchProducts(query);
                 int sequenceNumber = 1;
                 for (Product product : products) {
@@ -357,8 +347,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             }
 
             for (Product product : products) {
-                System.out.println("[DEBUG] ProductView.searchProducts: Adding to table - DisplayID=" + product.getDisplayId() + ", DB_ID=" + product.getId() +
-                                   ", Name=" + product.getName());
                 tableModel.addRow(new Object[]{
                     product.getDisplayId(),
                     product.getName(),
@@ -372,7 +360,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
             productTable.revalidate();
             productTable.repaint();
             applyThemeToTable();
-            System.out.println("[DEBUG] Searched products with query '" + query + "', found: " + products.size() + ", table rows: " + tableModel.getRowCount());
         } catch (SQLException e) {
             System.err.println("[ERROR] ProductView: Error searching products - " + e.getMessage());
             ErrorHandler.handleError(this, "Error searching products", e);
@@ -430,7 +417,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                     ThemeManager.applyThemeToComponent(comp);
                 }
             }
-            System.out.println("[DEBUG] ProductDialog applied theme - Background: " + getBackground());
         }
 
         private void saveProduct(Product product) {
@@ -502,12 +488,10 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
 
         @Override
         public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
-            System.out.println("[DEBUG] ProductDialog: Theme changed to " + newTheme);
             SwingUtilities.updateComponentTreeUI(this);
             applyThemeToComponents();
             repaint();
             revalidate();
-            System.out.println("[DEBUG] ProductDialog updated - Background: " + getBackground());
         }
     }
 
@@ -540,6 +524,18 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         int selectedRow = productTable.getSelectedRow();
         if (selectedRow >= 0) {
             int productId = (int) tableModel.getValueAt(selectedRow, 6);
+            JOptionPane optionPane = new JOptionPane(
+                "Are you sure you want to delete this product?",
+                JOptionPane.QUESTION_MESSAGE,
+                JOptionPane.YES_NO_OPTION
+            );
+            ThemeManager.applyThemeToOptionPane(optionPane);
+            JDialog dialog = optionPane.createDialog(this, "Confirm Delete");
+            dialog.setVisible(true);
+            Object selectedValue = optionPane.getValue();
+            if (selectedValue == null || !selectedValue.equals(JOptionPane.YES_OPTION)) {
+                return;
+            }
             try {
                 if (productDAO.deleteProduct(productId)) {
                     refreshTable();
@@ -561,8 +557,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
         boolean isManager = role.equals("manager");
         boolean isAdmin = role.equals("admin");
         boolean isStaff = role.equals("staff");
-
-        System.out.println("[DEBUG] ProductView.updateButtonStates: Current role: " + currentUser.getRole() + ", normalized role: " + role);
 
         // Owner has full access
         if (isOwner) {
@@ -648,13 +642,11 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
 
     @Override
     public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
-        System.out.println("[DEBUG] ProductView: Theme changed to " + newTheme);
         SwingUtilities.updateComponentTreeUI(this);
         applyThemeToTable();
         applyThemeToComponents();
         repaint();
         revalidate();
-        System.out.println("[DEBUG] ProductView background after update: " + getBackground());
     }
 
     private void applyThemeToComponents() {
@@ -670,7 +662,6 @@ public class ProductView extends JPanel implements ThemeManager.ThemeChangeListe
                 }
             }
         }
-        System.out.println("[DEBUG] ProductView applied theme - Background: " + getBackground());
     }
 
     private void applyThemeToFileChooser(JFileChooser fileChooser) {

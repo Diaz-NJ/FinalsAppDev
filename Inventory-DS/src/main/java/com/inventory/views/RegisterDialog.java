@@ -111,7 +111,6 @@ public void setRegisterCallback(RegisterCallback callback) {
     }
         @Override
     public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
-        System.out.println("[DEBUG] RegisterDialog: Theme changed to " + newTheme);
         SwingUtilities.updateComponentTreeUI(this);
     }
 }

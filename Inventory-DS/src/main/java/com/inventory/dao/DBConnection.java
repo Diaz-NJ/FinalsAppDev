@@ -15,17 +15,13 @@ public class DBConnection {
 
     public static Connection getConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            System.out.println("[DEBUG] Attempting to establish database connection...");
             try {
                 Class.forName("com.mysql.cj.jdbc.Driver");
                 connection = DriverManager.getConnection(URL, USER, PASSWORD);
-                System.out.println("[DEBUG] Database connection established successfully");
                 initializeDatabase(connection);
             } catch (ClassNotFoundException e) {
                 throw new SQLException("MySQL JDBC Driver not found!", e);
             }
-        } else {
-            System.out.println("[DEBUG] Reusing existing database connection");
         }
         return connection;
     }
@@ -33,7 +29,6 @@ public class DBConnection {
     public static void closeConnection() throws SQLException {
         if (connection != null && !connection.isClosed()) {
             connection.close();
-            System.out.println("[DEBUG] Database connection closed");
             connection = null;
         }
     }
@@ -49,7 +44,6 @@ public class DBConnection {
                                          "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL" +
                                          ")";
             stmt.executeUpdate(createAuditLogsTable);
-            System.out.println("[DEBUG] DBConnection: Ensured audit_logs table exists");
         }
     }
 }

@@ -34,14 +34,12 @@ public class ThemeTogglePanel extends JPanel implements ThemeManager.ThemeChange
 
     @Override
     public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
-        System.out.println("[DEBUG] ThemeTogglePanel: Theme changed to " + newTheme);
         updateButtonText();
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window != null) {
             SwingUtilities.updateComponentTreeUI(window);
             window.repaint();
             window.revalidate();
-            System.out.println("[DEBUG] ThemeTogglePanel updated window: " + window.getClass().getSimpleName());
         }
     }
 

@@ -64,11 +64,9 @@ public class ThemeManager {
 
     public static void setTheme(ThemeMode theme) {
         if (currentTheme == theme) {
-            System.out.println("[DEBUG] Theme already set to: " + theme + ", skipping update");
             return;
         }
 
-        System.out.println("[DEBUG] Setting theme to: " + theme);
         currentTheme = theme;
         Map<String, Color> colors = (theme == ThemeMode.LIGHT) ? LIGHT_COLORS : DARK_COLORS;
 
@@ -96,9 +94,6 @@ public class ThemeManager {
             UIManager.put("ComboBox:\"ComboBox.renderer\"[Selected].background", colors.get("ComboBox.selectionBackground"));
             UIManager.put("ComboBox:\"ComboBox.renderer\"[Selected].textForeground", colors.get("ComboBox.selectionForeground"));
             UIManager.put("TextField.caretForeground", colors.get("TextField.caret")); // Added for Nimbus
-            System.out.println("[DEBUG] Applied Nimbus-specific UIManager properties");
-        } else {
-            System.out.println("[DEBUG] NimbusLookAndFeel not active, skipping Nimbus-specific properties");
         }
 
         // Force update of all UI components
@@ -109,7 +104,6 @@ public class ThemeManager {
             }
             frame.repaint();
             frame.revalidate();
-            System.out.println("[DEBUG] Updated frame: " + frame.getClass().getSimpleName());
         }
 
         // Notify all listeners
@@ -125,7 +119,6 @@ public class ThemeManager {
     public static void addThemeChangeListener(ThemeChangeListener listener) {
         if (!listeners.contains(listener)) {
             listeners.add(listener);
-            System.out.println("[DEBUG] Added theme change listener: " + listener.getClass().getSimpleName());
         }
     }
 

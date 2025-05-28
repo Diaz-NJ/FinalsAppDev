@@ -29,7 +29,6 @@ public class AuditLogView extends JPanel implements ThemeManager.ThemeChangeList
         throw new SecurityException("Permission denied: Only Owner, Manager, or Admin can view audit logs");
     }
         if (conn == null || conn.isClosed()) {
-            System.err.println("[DEBUG] AuditLogView: Connection is null or closed");
             return; // Prevent further execution if connection is invalid
         }
         this.auditLogDAO = new AuditLogDAO(conn);
@@ -85,10 +84,7 @@ public class AuditLogView extends JPanel implements ThemeManager.ThemeChangeList
         try {
             tableModel.setRowCount(0);
             List<AuditLogDAO.AuditLog> logs = auditLogDAO.getAllAuditLogs();
-            System.out.println("[DEBUG] AuditLogView: Loaded " + logs.size() + " audit logs from database");
             for (AuditLogDAO.AuditLog log : logs) {
-                System.out.println("[DEBUG] AuditLogView: Adding log - ID: " + log.getId() + ", Username: " + log.getUsername() + 
-                                   ", Action: " + log.getAction() + ", Details: " + log.getDetails() + ", Timestamp: " + log.getTimestamp());
                 tableModel.addRow(new Object[]{
                     log.getId(),
                     log.getUsername(),
@@ -98,7 +94,6 @@ public class AuditLogView extends JPanel implements ThemeManager.ThemeChangeList
                 });
             }
             applyThemeToTable();
-            System.out.println("[DEBUG] AuditLogView: Refreshed table with " + logs.size() + " logs");
         } catch (SQLException e) {
             System.err.println("[ERROR] AuditLogView: SQLException - " + e.getMessage());
             ErrorHandler.handleError(this, "Error loading audit logs", e);
@@ -107,7 +102,6 @@ public class AuditLogView extends JPanel implements ThemeManager.ThemeChangeList
 
     private void searchLogs() {
         String query = searchField.getText().trim();
-        System.out.println("[DEBUG] AuditLogView.searchLogs: Query = '" + query + "'");
         try {
             tableModel.setRowCount(0);
             List<AuditLogDAO.AuditLog> logs = query.isEmpty() ? auditLogDAO.getAllAuditLogs() : auditLogDAO.searchAuditLogs(query);
@@ -121,7 +115,6 @@ public class AuditLogView extends JPanel implements ThemeManager.ThemeChangeList
                 });
             }
             applyThemeToTable();
-            System.out.println("[DEBUG] Searched audit logs with query '" + query + "', found: " + logs.size());
         } catch (SQLException e) {
             System.err.println("[ERROR] AuditLogView: SQLException during search - " + e.getMessage());
             ErrorHandler.handleError(this, "Error searching audit logs", e);
@@ -135,7 +128,6 @@ public class AuditLogView extends JPanel implements ThemeManager.ThemeChangeList
         logTable.setForeground(colors.get("Table.foreground"));
         logTable.setGridColor(colors.get("Table.gridColor"));
         logTable.repaint();
-        System.out.println("[DEBUG] AuditLogView table updated - Background: " + logTable.getBackground());
     }
 
     private void applyThemeToComponents() {
@@ -152,17 +144,14 @@ public class AuditLogView extends JPanel implements ThemeManager.ThemeChangeList
                 }
             }
         }
-        System.out.println("[DEBUG] AuditLogView applied theme - Background: " + getBackground());
     }
 
     @Override
     public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
-        System.out.println("[DEBUG] AuditLogView: Theme changed to " + newTheme);
         SwingUtilities.updateComponentTreeUI(this);
         applyThemeToTable();
         applyThemeToComponents();
         repaint();
         revalidate();
-        System.out.println("[DEBUG] AuditLogView background after update: " + getBackground());
     }
 }

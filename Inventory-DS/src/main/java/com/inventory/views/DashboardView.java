@@ -167,19 +167,13 @@ public class DashboardView extends JFrame implements ThemeManager.ThemeChangeLis
         for (Component tab : tabbedPane.getComponents()) {
             ThemeManager.applyThemeToComponent(tab);
         }
-        
-        System.out.println("[DEBUG] DashboardView applied theme - ContentPane Background: " + getContentPane().getBackground());
-        System.out.println("[DEBUG] DashboardView toolbar background: " + toolBar.getBackground());
-        System.out.println("[DEBUG] DashboardView tabbedPane background: " + tabbedPane.getBackground());
     }
 
     @Override
     public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
-        System.out.println("[DEBUG] DashboardView: Theme changed to " + newTheme);
         SwingUtilities.updateComponentTreeUI(this);
         applyThemeToComponents();
         repaint();
         revalidate();
-        System.out.println("[DEBUG] DashboardView contentPane background after update: " + getContentPane().getBackground());
     }
 }

@@ -87,7 +87,6 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
                 AuditLogDAO auditLogDAO = new AuditLogDAO(conn);
                 auditLogDAO.logAction(authenticatedUser.getId(), "User Logged In", 
                     "Username: " + username + ", Role: " + role);
-                System.out.println("[DEBUG] LoginView: Logged 'User Logged In' action for user: " + username);
 
                 SessionManager.startSession(authenticatedUser);
                 this.dispose();
@@ -112,7 +111,6 @@ public class LoginView extends JFrame implements ThemeManager.ThemeChangeListene
 
     @Override
     public void onThemeChanged(ThemeManager.ThemeMode newTheme) {
-        System.out.println("[DEBUG] LoginView: Theme changed to " + newTheme);
         SwingUtilities.updateComponentTreeUI(this);
         ThemeManager.applyThemeToComponent(this);
     }

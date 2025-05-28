@@ -18,20 +18,13 @@ public class AuditLogDAO {
             try {
                 if (!conn.getAutoCommit()) {
                     conn.setAutoCommit(true);
-                    System.out.println("[DEBUG] AuditLogDAO: Enabled auto-commit");
                 }
-                System.out.println("[DEBUG] AuditLogDAO: Connection is " + (conn.isClosed() ? "closed" : "open"));
-            } catch (SQLException e) {
-                System.err.println("[DEBUG] AuditLogDAO: Failed to check/set auto-commit - " + e.getMessage());
-            }
-        } else {
-            System.err.println("[DEBUG] AuditLogDAO: Connection is null");
+            } catch (SQLException e) {}
         }
     }
 
     public void logAction(int userId, String action, String details) throws SQLException {
         if (conn == null || conn.isClosed()) {
-            System.err.println("[DEBUG] AuditLogDAO: Cannot log action - Connection is null or closed");
             throw new SQLException("Database connection is invalid");
         }
         String sql = "INSERT INTO audit_logs (user_id, action, details, timestamp) VALUES (?, ?, ?, ?)";
@@ -44,8 +37,7 @@ public class AuditLogDAO {
             stmt.setString(2, action);
             stmt.setString(3, details);
             stmt.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
-            int rowsAffected = stmt.executeUpdate();
-            System.out.println("[DEBUG] AuditLogDAO: Logged action - UserID=" + userId + ", Action='" + action + "', Details='" + details + "', Rows affected: " + rowsAffected);
+            stmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("[ERROR] AuditLogDAO: Failed to log action - " + e.getMessage());
             throw e; // Re-throw to ensure the caller handles it
@@ -55,7 +47,6 @@ public class AuditLogDAO {
     public List<AuditLog> getAllAuditLogs() throws SQLException {
         List<AuditLog> logs = new ArrayList<>();
         if (conn == null || conn.isClosed()) {
-            System.err.println("[DEBUG] AuditLogDAO: Cannot retrieve logs - Connection is null or closed");
             throw new SQLException("Database connection is invalid");
         }
         String sql = "SELECT al.id, al.user_id, u.username, al.action, al.details, al.timestamp " +
@@ -80,7 +71,6 @@ public class AuditLogDAO {
     public List<AuditLog> searchAuditLogs(String query) throws SQLException {
         List<AuditLog> logs = new ArrayList<>();
         if (conn == null || conn.isClosed()) {
-            System.err.println("[DEBUG] AuditLogDAO: Cannot search logs - Connection is null or closed");
             throw new SQLException("Database connection is invalid");
         }
         String sql = "SELECT al.id, al.user_id, u.username, al.action, al.details, al.timestamp " +

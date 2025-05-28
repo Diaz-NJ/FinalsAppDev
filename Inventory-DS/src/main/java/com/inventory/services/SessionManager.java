@@ -17,9 +17,7 @@ public class SessionManager {
         try {
             Connection conn = DBConnection.getConnection();
             auditLogDAO = new AuditLogDAO(conn);
-        } catch (SQLException e) {
-            System.err.println("[ERROR] Failed to initialize AuditLogDAO in SessionManager: " + e.getMessage());
-        }
+        } catch (SQLException e) {}
     }
 
     public static void startSession(User user) {
@@ -31,9 +29,7 @@ public class SessionManager {
         try {
             auditLogDAO.logAction(user.getId(), "User Login", 
                 String.format("Username: %s, Role: %s", user.getUsername(), user.getRole()));
-        } catch (SQLException e) {
-            System.err.println("[ERROR] Failed to log login action for user " + user.getUsername() + ": " + e.getMessage());
-        }
+        } catch (SQLException e) {}
         System.out.println("Session started for: " + user.getUsername());
     }
 

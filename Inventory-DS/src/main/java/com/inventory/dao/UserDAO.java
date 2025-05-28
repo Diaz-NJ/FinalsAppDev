@@ -42,7 +42,6 @@ public class UserDAO {
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     boolean exists = rs.getInt(1) > 0;
-                    System.out.println("[DEBUG] usernameExists('" + username + "') -> " + exists);
                     return exists;
                 }
             }
@@ -55,7 +54,6 @@ public class UserDAO {
         try {
             conn.setAutoCommit(false);
             if (usernameExists(user.getUsername())) {
-                System.out.println("[DEBUG] addUser: Username '" + user.getUsername() + "' already exists, aborting insert");
                 conn.rollback();
                 return false;
             }
@@ -75,13 +73,10 @@ public class UserDAO {
                     }
                     auditLogDAO.logAction(user.getId(), "User Added", 
                         String.format("Username: %s, Role: %s", user.getUsername(), user.getRole()));
-                    System.out.println("[DEBUG] UserDAO: Logged 'User Added' action for user ID: " + user.getId());
                     conn.commit();
-                    System.out.println("[DEBUG] Successfully added user: " + user.getUsername() + " with ID: " + user.getId());
                     return true;
                 } else {
                     conn.rollback();
-                    System.out.println("[DEBUG] Failed to add user: " + user.getUsername() + " (no rows affected)");
                     return false;
                 }
             }
@@ -116,7 +111,6 @@ public class UserDAO {
             conn.setAutoCommit(false);
             String details = String.format("User ID: %d, Username: %s", userId, username != null ? username : "Unknown");
             auditLogDAO.logAction(userId, "User Deleted", details); // Log before deletion
-            System.out.println("[DEBUG] UserDAO: Logged 'User Deleted' action for user ID: " + userId);
 
             sql = "DELETE FROM users WHERE id = ?";
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -124,11 +118,9 @@ public class UserDAO {
                 int affectedRows = stmt.executeUpdate();
                 if (affectedRows > 0) {
                     conn.commit();
-                    System.out.println("[DEBUG] Successfully deleted user with ID: " + userId);
                     return true;
                 } else {
                     conn.rollback();
-                    System.out.println("[DEBUG] No user found with ID: " + userId);
                     return false;
                 }
             }
@@ -163,7 +155,6 @@ public class UserDAO {
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, "%" + trimmedQuery + "%");
             stmt.setString(2, "%" + trimmedQuery + "%");
-            System.out.println("[DEBUG] searchUsers: Executing SQL = " + sql + " with params [username=%" + trimmedQuery + "%, role=%" + trimmedQuery + "%]");
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     User user = new User(rs.getInt("id"), rs.getString("username"), rs.getString("role"));
@@ -172,7 +163,6 @@ public class UserDAO {
                 }
             }
         }
-        System.out.println("[DEBUG] searchUsers('" + trimmedQuery + "') -> found " + users.size() + " users");
         return users;
     }
 }
